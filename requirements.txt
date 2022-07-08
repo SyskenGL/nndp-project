@@ -1,1 +1,4 @@
 numpy~=1.23.0
+nndp~=1.0.0
+scipy~=1.8.1
+setuptools~=57.0.0
