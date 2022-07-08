@@ -22,10 +22,10 @@ class Dense(Layer):
         super().__init__(name)
         if in_size <= 0 or width <= 0:
             attr = "in_size" if in_size <= 0 else "width"
-            raise ValueError(f"{attr} value must be greater than zero")
+            raise ValueError(f"{attr} value must be greater than zero.")
         if isinstance(type(activation), Activation):
             raise ValueError(
-                f"Expected type {Activation} for activation, received {type(activation)}."
+                f"expected type {Activation} for activation, received {type(activation)}."
             )
         self.name = name
         self.in_size = in_size
