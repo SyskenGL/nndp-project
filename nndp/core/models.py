@@ -4,7 +4,7 @@ from nndp.errors import IncompatibleLayersError
 from nndp.core.layers import Layer
 
 
-class Serial:
+class Sequential:
 
     def __init__(self, layers: list[Layer] = None):
         if len(layers) > 1:
