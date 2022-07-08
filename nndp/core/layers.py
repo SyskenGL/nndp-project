@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 import numpy as np
-from nndp.math.function import Activation
+from nndp.math.functions import Activation
 
 
 class Layer:
 
-    def __init__(self, name):
+    def __init__(self, name: str, in_size: int, width: int):
+        if in_size <= 0 or width <= 0:
+            attr = "in_size" if in_size <= 0 else "width"
+            raise ValueError(f"{attr} value must be greater than zero.")
         self.name = name
+        self.in_size = in_size
+        self.width = width
         self.in_data = None
         self.out_data = None
 
@@ -23,17 +28,11 @@ class Dense(Layer):
         activation: Activation,
         name: str = "N/D"
     ):
-        super().__init__(name)
-        if in_size <= 0 or width <= 0:
-            attr = "in_size" if in_size <= 0 else "width"
-            raise ValueError(f"{attr} value must be greater than zero.")
+        super().__init__(name, in_size, width)
         if isinstance(type(activation), Activation):
             raise ValueError(
                 f"expected type {Activation} for activation, received {type(activation)}."
             )
-        self.name = name
-        self.in_size = in_size
-        self.width = width
         self.activation = activation
         self.weights = np.random.randn(width, in_size)
         self.biases = np.random.randn(width, 1)
