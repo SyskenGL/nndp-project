@@ -17,7 +17,11 @@ class Layer:
 class Dense(Layer):
 
     def __init__(
-        self, in_size: int, width: int, activation: Activation, name: str = "N/D"
+        self,
+        in_size: int,
+        width: int,
+        activation: Activation,
+        name: str = "N/D"
     ):
         super().__init__(name)
         if in_size <= 0 or width <= 0:
