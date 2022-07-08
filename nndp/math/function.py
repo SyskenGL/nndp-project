@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import numpy as np
+from enum import Enum
 
 
 def identity(x: np.ndarray) -> np.ndarray:
@@ -16,3 +17,26 @@ def relu(x: np.ndarray) -> np.ndarray:
 
 def tanh(x: np.ndarray) -> np.ndarray:
     return (np.exp(x) - np.exp(-x)) / (np.exp(x) + np.exp(-x))
+
+
+class Function(Enum):
+
+    IDENTITY = {
+        "function": identity,
+        "prime": None
+    }
+
+    SIGMOID = {
+        "function": sigmoid,
+        "prime": None
+    }
+
+    RELU = {
+        "function": relu,
+        "prime": None
+    }
+
+    TANH = {
+        "function": tanh,
+        "prime": None
+    }

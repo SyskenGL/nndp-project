@@ -3,22 +3,7 @@ import typing
 import numpy as np
 
 
-class Layer:
-
-    def __init__(self, name: str, in_size: int, width: int, activation: typing.Callable):
-        self.name = name
-        self.in_size = in_size
-        self.width = width
-        self.activation = activation
-        self.weight = np.random.randn(width, in_size)
-        self.bias = np.random.randn(width)
-
-    def compute(self, layer_in: np.ndarray) -> np.ndarray:
-        layer_out = np.dot(self.weight, layer_in) + self.bias
-        return self.activation(layer_out)
-
-
-class MultiLayer:
+class Multilayer:
 
     def __init__(self, layers: list[Layer]):
         self.layers = layers
