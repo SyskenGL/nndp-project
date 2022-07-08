@@ -22,11 +22,7 @@ class Layer:
 class Dense(Layer):
 
     def __init__(
-        self,
-        in_size: int,
-        width: int,
-        activation: Activation,
-        name: str = "N/D"
+        self, in_size: int, width: int, activation: Activation, name: str = "N/D"
     ):
         super().__init__(name, in_size, width)
         if isinstance(type(activation), Activation):
@@ -46,6 +42,8 @@ class Dense(Layer):
         return self.out_data
 
     def __str__(self) -> str:
-        return f"Dense layer ({self.name}): " \
-               f"[in_size: {self.in_size} - width: {self.width} - " \
-               f"activation: {self.activation.function().__name__}]"
+        return (
+            f"Dense layer ({self.name}): "
+            f"[in_size: {self.in_size} - width: {self.width} - "
+            f"activation: {self.activation.function().__name__}]"
+        )

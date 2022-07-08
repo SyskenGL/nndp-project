@@ -71,20 +71,10 @@ class Activation(Enum):
     TANH = 3
 
     def function(self):
-        return [
-            identity,
-            sigmoid,
-            relu,
-            tanh
-        ][self.value]
+        return [identity, sigmoid, relu, tanh][self.value]
 
     def prime(self):
-        return [
-            identity_prime,
-            sigmoid_prime,
-            relu_prime,
-            tanh_prime
-        ][self.value]
+        return [identity_prime, sigmoid_prime, relu_prime, tanh_prime][self.value]
 
 
 class Error(Enum):
@@ -94,15 +84,7 @@ class Error(Enum):
     SOFTMAX_CROSS_ENTROPY = 2
 
     def function(self):
-        return [
-            sse,
-            cross_entropy,
-            softmax_cross_entropy
-        ][self.value]
+        return [sse, cross_entropy, softmax_cross_entropy][self.value]
 
     def prime(self):
-        return [
-            sse_prime,
-            cross_entropy_prime,
-            softmax_cross_entropy_prime
-        ][self.value]
+        return [sse_prime, cross_entropy_prime, softmax_cross_entropy_prime][self.value]
