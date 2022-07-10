@@ -51,7 +51,7 @@ def cross_entropy(y: np.ndarray, t: np.ndarray, epsilon=1e-12) -> float:
 
 
 def cross_entropy_prime(y: np.ndarray, t: np.ndarray) -> float:
-    return (- t / y) + (1 - t) / (1 - y)
+    return - t / y
 
 
 def softmax_cross_entropy(y: np.ndarray, t: np.ndarray) -> float:
@@ -59,8 +59,7 @@ def softmax_cross_entropy(y: np.ndarray, t: np.ndarray) -> float:
 
 
 def softmax_cross_entropy_prime(y: np.ndarray, t: np.ndarray) -> float:
-    ce = cross_entropy_prime(y, t)
-    return ce - t
+    return softmax(y) - t
 
 
 class Activation(Enum):
