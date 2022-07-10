@@ -8,7 +8,7 @@ class Sequential:
 
     def __init__(self, layers: list[Layer] = None):
         self.layers = layers if layers else []
-        if len(self.layers) > 1:
+        if len(self.layers):
             for h in range(1, len(self.layers)):
                 if self.layers[h].in_size != self.layers[h - 1].width:
                     raise IncompatibleLayersError(
@@ -17,7 +17,7 @@ class Sequential:
                     )
 
     def add(self, layer: Layer):
-        if len(self.layers) > 1:
+        if len(self.layers):
             if layer.in_size != self.layers[-1].width:
                 raise IncompatibleLayersError(
                     f"in_size {layer.in_size} is not equal "
