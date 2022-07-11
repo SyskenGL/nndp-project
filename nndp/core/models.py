@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import numpy as np
+from tabulate import tabulate
 from nndp.errors import IncompatibleLayersError
 from nndp.core.layers import Layer
 
@@ -30,3 +31,33 @@ class Sequential:
         for layer in self.layers:
             out_data = layer.feed_forward(out_data)
         return out_data
+
+    def __str__(self) -> str:
+        return (
+            " ■ Neural Network: \n" +
+            str(tabulate(
+                [
+                    ["TYPE", self.__class__.__name__],
+                    ["INPUT", self.layers[0].in_size if len(self.layers) else 0],
+                    ["OUTPUT", self.layers[-1].in_size if len(self.layers) else 0],
+                    ["LAYERS", len(self.layers)],
+                    ["LOSS", None]
+                ],
+                tablefmt="fancy_grid",
+                colalign=["center"]*2
+            )) +
+            "\n\n ■ Detailed Neural Network: \n" +
+            str(tabulate(
+                [[
+                    ("I:" if (h == 0) else ("O:" if (h == len(self.layers) - 1) else "H:")) + str(h),
+                    self.layers[h].name,
+                    self.layers[h].type,
+                    self.layers[h].in_size,
+                    self.layers[h].width,
+                    self.layers[h].activation.function().__name__
+                ] for h in range(0, len(self.layers))],
+                headers=["DEPTH", "NAME", "TYPE", "IN_SIZE", "WIDTH", "ACTIVATION"],
+                tablefmt="fancy_grid",
+                colalign=["center"] * 6
+            ))
+        )
