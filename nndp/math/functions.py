@@ -76,7 +76,7 @@ class Activation(Enum):
         return [identity_prime, sigmoid_prime, relu_prime, tanh_prime][self.value]
 
 
-class Error(Enum):
+class Loss(Enum):
 
     SSE = 0
     CROSS_ENTROPY = 1
