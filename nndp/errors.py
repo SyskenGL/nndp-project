@@ -7,7 +7,13 @@ class IncompatibleLayersError(Exception):
         super().__init__(message)
 
 
-class NotBuiltLayerError(Exception):
+class NotBuiltError(Exception):
+
+    def __init__(self, message: str = None):
+        super().__init__(message)
+
+
+class AlreadyBuiltError(Exception):
 
     def __init__(self, message: str = None):
         super().__init__(message)

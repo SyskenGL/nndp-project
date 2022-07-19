@@ -2,14 +2,21 @@
 from __future__ import annotations
 import uuid
 import numpy as np
+from enum import Enum, auto
 from tabulate import tabulate
-from nndp.errors import NotBuiltLayerError
+from nndp.utils.decorators import require_built
 from nndp.math.functions import Activation
+
+
+class Category(Enum):
+
+    HIDDEN = auto()
+    OUTPUT = auto()
 
 
 class Layer:
 
-    def _init_(
+    def __init__(
         self,
         in_size: int,
         width: int,
@@ -25,16 +32,25 @@ class Layer:
         self._name = (
             name if name else f"{self.__class__.__name__}_{str(uuid.uuid4())[:8]}"
         )
+        self._category = None
         self._in_data = None
+        self._in_weighted = None
         self._out_data = None
-        self._delta = None
         self._weights = None
         self._biases = None
+        self._delta = None
+        self._accumulated_weights_delta = None
+        self._accumulated_biases_delta = None
 
-    def build(self, weights: np.ndarray = None, biases: np.ndarray = None) -> Layer:
+    def build(
+        self,
+        category: Category = Category.HIDDEN,
+        weights: np.ndarray = None,
+        biases: np.ndarray = None
+    ) -> Layer:
         raise NotImplementedError
 
-    def is_built(self):
+    def is_built(self) -> bool:
         return self._weights is not None and self._biases is not None
 
     def forward_propagation(self, in_data: np.ndarray) -> np.ndarray:
@@ -43,7 +59,7 @@ class Layer:
     def backward_propagation(self, expected: np.ndarray) -> np.ndarray:
         raise NotImplementedError
 
-    def update(self, delta: np.ndarray, learning_rate: float = 0.001) -> None:
+    def update(self, learning_rate: float = 0.001) -> None:
         raise NotImplementedError
 
     @property
@@ -63,6 +79,14 @@ class Layer:
         return self._name
 
     @property
+    def in_data(self) -> np.ndarray:
+        return self._in_data
+
+    @property
+    def in_weighted(self) -> np.ndarray:
+        return self._in_weighted
+
+    @property
     def out_data(self) -> np.ndarray:
         return self._out_data
 
@@ -71,18 +95,20 @@ class Layer:
         return self._delta
 
     def __str__(self) -> str:
-        return str(tabulate([[
-                self._name,
-                self._in_size,
-                self._width,
-                self._activation.function().__name__,
-                self._in_data if self._in_data else "-",
-                self._out_data if self._out_data else "-"
-            ]],
-            headers=["name", "in_size", "width", "activation", "in_data", "out_data"],
-            tablefmt="fancy_grid",
-            colalign=["center"]*6
-        ))
+        with np.printoptions(formatter={'float': '{: 0.5f}'.format}, suppress=True):
+            return str(tabulate([[
+                    self._category if self._category else "-",
+                    self._name,
+                    self._in_size,
+                    self._width,
+                    self._activation.function().__name__,
+                ]],
+                headers=[
+                    "category", "name", "in_size", "width", "activation"
+                ],
+                tablefmt="fancy_grid",
+                colalign=["center"]*5
+            ))
 
 
 class Dense(Layer):
@@ -91,14 +117,20 @@ class Dense(Layer):
         self,
         in_size: int,
         width: int,
-        activation: Activation = Activation.IDENTITY,
+        activation: Activation = Activation.SIGMOID,
         name: str = None,
     ):
-        super()._init_(in_size, width, activation, name)
+        super().__init__(in_size, width, activation, name)
 
-    def build(self, weights: np.ndarray = None, biases: np.ndarray = None) -> Dense:
+    def build(
+        self,
+        category: Category = Category.HIDDEN,
+        weights: np.ndarray = None,
+        biases: np.ndarray = None
+    ) -> Dense:
         if self.is_built():
             return self
+        self._category = category
         if weights is not None:
             if (self._width, self._in_size) != weights.shape:
                 raise ValueError(
@@ -115,25 +147,27 @@ class Dense(Layer):
             self._biases = biases
         else:
             self._biases = np.random.randn(self._width, 1)
+        self._accumulated_weights_delta = np.zeros((self._width, self._in_size))
+        self._accumulated_biases_delta = np.zeros((self._width, 1))
         return self
 
-    @Layer.require_built
+    @require_built
     def forward_propagation(self, in_data: np.ndarray) -> np.ndarray:
-        if not self.is_built():
-            raise NotBuiltLayerError("undefined weights and biases.")
         in_data = np.reshape(in_data, (self._in_size, 1))
         self._in_data = in_data
-        self._out_data = self._activation.function()(
-            np.dot(self._weights, in_data) + self._biases
-        )
+        self._in_weighted = self._weights @ in_data + self._biases
+        self._out_data = self._activation.function()(self._in_weighted)
         return self._out_data
 
-    @Layer.require_built
-    def backward_propagation(self, expected: np.ndarray) -> np.ndarray:
-        if not self.is_built():
-            raise NotBuiltLayerError("attempt to operate on an non-built layer.")
+    @require_built
+    def backward_propagation(self, delta: np.ndarray) -> np.ndarray:
+        delta = np.reshape(delta, (self._width, 1))
+        self._delta = self._activation.prime()(self._in_weighted) * delta
+        return self._weights.T @ delta
 
-    @Layer.require_built
-    def update(self, delta: np.ndarray, learning_rate: float = 0.001) -> None:
-        if not self.is_built():
-            raise NotBuiltLayerError("attempt to operate on an non-built layer.")
+    @require_built
+    def update(self, learning_rate: float = 0.001) -> None:
+        self._accumulated_weights_delta += (self._delta @ self._in_data.T)
+        self._accumulated_biases_delta += self._delta
+        self._weights -= learning_rate * self._accumulated_weights_delta
+        self._biases -= learning_rate * self._accumulated_biases_delta
