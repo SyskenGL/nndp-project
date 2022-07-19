@@ -95,20 +95,19 @@ class Layer:
         return self._delta
 
     def __str__(self) -> str:
-        with np.printoptions(formatter={'float': '{: 0.5f}'.format}, suppress=True):
-            return str(tabulate([[
-                    self._category if self._category else "-",
-                    self._name,
-                    self._in_size,
-                    self._width,
-                    self._activation.function().__name__,
-                ]],
-                headers=[
-                    "category", "name", "in_size", "width", "activation"
-                ],
-                tablefmt="fancy_grid",
-                colalign=["center"]*5
-            ))
+        return str(tabulate([[
+                self._category if self._category else "-",
+                self._name,
+                self._in_size,
+                self._width,
+                self._activation.function().__name__,
+            ]],
+            headers=[
+                "category", "name", "in_size", "width", "activation"
+            ],
+            tablefmt="fancy_grid",
+            colalign=["center"]*5
+        ))
 
 
 class Dense(Layer):
