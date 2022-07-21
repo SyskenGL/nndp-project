@@ -158,7 +158,7 @@ from sklearn.metrics import f1_score
 
 
 def get_mnist_data(valid=None):
-    mdata = MNIST('../data', return_type='numpy')
+    mdata = MNIST('../data/mnist', return_type='numpy')
 
     train_data, train_labels = mdata.load_training()
     test_data, test_labels = mdata.load_testing()
