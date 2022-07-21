@@ -39,8 +39,6 @@ class Layer:
         self._weights = None
         self._biases = None
         self._delta = None
-        self._accumulated_weights_delta = None
-        self._accumulated_biases_delta = None
 
     def build(
         self,
@@ -69,6 +67,10 @@ class Layer:
     @property
     def width(self) -> int:
         return self._width
+
+    @property
+    def category(self) -> Category:
+        return self._category
 
     @property
     def activation(self) -> Activation:
@@ -120,6 +122,8 @@ class Dense(Layer):
         name: str = None,
     ):
         super().__init__(in_size, width, activation, name)
+        self._accumulated_weights_delta = None
+        self._accumulated_biases_delta = None
 
     def build(
         self,
@@ -152,7 +156,7 @@ class Dense(Layer):
 
     @require_built
     def forward_propagation(self, in_data: np.ndarray) -> np.ndarray:
-        in_data = np.reshape(in_data, (self._in_size, 1))
+        in_data = np.reshape(in_data, (-1, 1))
         self._in_data = in_data
         self._in_weighted = self._weights @ in_data + self._biases
         self._out_data = self._activation.function()(self._in_weighted)
@@ -160,13 +164,16 @@ class Dense(Layer):
 
     @require_built
     def backward_propagation(self, delta: np.ndarray) -> np.ndarray:
-        delta = np.reshape(delta, (self._width, 1))
+        delta = np.reshape(delta, (-1, 1))
         self._delta = self._activation.prime()(self._in_weighted) * delta
         return self._weights.T @ delta
 
     @require_built
-    def update(self, learning_rate: float = 0.001) -> None:
+    def update(self, learning_rate: float = None) -> None:
         self._accumulated_weights_delta += (self._delta @ self._in_data.T)
         self._accumulated_biases_delta += self._delta
-        self._weights -= learning_rate * self._accumulated_weights_delta
-        self._biases -= learning_rate * self._accumulated_biases_delta
+        if learning_rate is not None:
+            self._weights -= learning_rate * self._accumulated_weights_delta
+            self._biases -= learning_rate * self._accumulated_biases_delta
+            self._accumulated_weights_delta = np.zeros((self._width, self._in_size))
+            self._accumulated_biases_delta = np.zeros((self._width, 1))
