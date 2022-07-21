@@ -6,7 +6,9 @@ class Set:
 
     def __init__(self, data: np.ndarray, labels: np.ndarray):
         if data.shape[0] != labels.shape[0]:
-            raise ValueError(f"data and label sizes do not match ({data.shape[0]} != {labels.shape[0]}).")
+            raise ValueError(
+                f"data and label sizes do not match ({data.shape[0]} != {labels.shape[0]})."
+            )
         self._data = data
         self._labels = labels
 
