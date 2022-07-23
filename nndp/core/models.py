@@ -1,60 +1,77 @@
 #!/usr/bin/env python3
 from __future__ import annotations
+import uuid
 import numpy as np
-from typing import Optional
+from tabulate import tabulate
 from nndp.math.functions import Loss
-from nndp.core.layers import Layer, Category
-from nndp.errors import IncompatibleLayersError
+from nndp.core.layers import Layer
 from nndp.utils.collections import Set
-from nndp.utils.decorators import require_built, require_not_built
+from nndp.errors import EmptyModelError
+from nndp.utils.decorators import require_built
+from nndp.utils.decorators import require_not_built
 
 
 class Sequential:
 
-    def __init__(self, layers: list[Layer] = None, loss: Loss = Loss.SSE):
+    def __init__(
+        self,
+        layers: list[Layer] = None,
+        loss: Loss = Loss.SSE,
+        name: str = None,
+    ):
+        self._name = (
+            name if name is not None
+            else f"{self.__class__.__name__}_{str(uuid.uuid4())[:8]}"
+        )
         self._layers = layers if layers else []
-        for h in range(1, len(self._layers)):
-            if self._layers[h].in_size != self._layers[h - 1].width:
-                raise IncompatibleLayersError(
-                    f"in_size {self._layers[h].in_size} is not equal "
-                    f"to previous layer width {self._layers[h - 1].width}."
-                )
         self._loss = loss
 
-    def build(
-        self, weights: list[np.ndarray] = None, biases: list[np.ndarray] = None
-    ) -> Sequential:
-        if self.is_built():
-            return self
-        for h in range(0, self.depth):
-            if self._layers[h].is_built():
-                if h != (self.depth - 1) and self._layers[h].category.value != Category.HIDDEN.value:
-                    raise IncompatibleLayersError(
-                        f"expected {Category.HIDDEN} layer, received {self._layers[h].category} layer."
-                    )
-                if h == (self.depth - 1) and self._layers[h].category.value != Category.OUTPUT.value:
-                    raise IncompatibleLayersError(
-                        f"expected {Category.OUTPUT} layer, received {self._layers[h].category} layer."
-                    )
-            self._layers[h].build(
-                Category.HIDDEN if h != (self.depth - 1) else Category.OUTPUT,
-                weights[h] if weights else None,
-                biases[h] if biases else None
-            )
-        return self
-
     def is_built(self) -> bool:
-        return all([layer.is_built() for layer in self._layers])
+        return (
+            len(self._layers) != 0 and
+            all([layer.is_built() for layer in self._layers])
+        )
+
+    @require_not_built
+    def build(
+        self,
+        in_size: int,
+        weights: list[np.ndarray] = None,
+        biases: list[np.ndarray] = None
+    ) -> None:
+        if len(self._layers) == 0:
+            raise EmptyModelError(
+                f"attempt to build an empty model {self.__class__.__name__}"
+            )
+        if in_size <= 0:
+            raise ValueError(
+                f"expected in_size value greater than zero, received {in_size}."
+            )
+        if weights is not None and len(weights) != len(self._layers):
+            raise ValueError(
+                f"expected a list of weights of "
+                f"length {len(self._layers)}, received {len(weights)}."
+            )
+        if biases is not None and len(biases) != len(self._layers):
+            raise ValueError(
+                f"expected a list of biases of "
+                f"length {len(self._layers)}, received {len(biases)}."
+            )
+        for h in range(0, self.depth):
+            self._layers[h].build(
+                self._layers[h - 1].width if h != 0 else in_size,
+                weights[0] if weights else None,
+                biases[0] if biases else None
+            )
 
     @require_not_built
     def add(self, layer: Layer) -> None:
-        if len(self._layers) and (layer.in_size != self._layers[-1].width):
-            raise IncompatibleLayersError(
-                f"in_size {layer.in_size} is not equal "
-                f"to previous layer width {self._layers[-1].width}."
-            )
         self._layers.append(layer)
 
+    def add_all(self, layers: list[Layer]) -> None:
+        self._layers.extend(layers)
+
+    """
     @require_built
     def predict(self, in_data: np.ndarray) -> np.ndarray:
         self._forward_propagation(in_data)
@@ -90,6 +107,7 @@ class Sequential:
                         if (n_batches == 0 or instance == batch.size - 1)
                         else None
                     )
+    
 
     @require_built
     def _forward_propagation(self, in_data: np.ndarray) -> None:
@@ -107,96 +125,99 @@ class Sequential:
     def _update(self, learning_rate) -> None:
         for layer in self._layers:
             layer.update(learning_rate)
+    """
+
+    @property
+    def name(self) -> str:
+        return self._name
 
     @property
     def depth(self) -> int:
         return len(self._layers)
 
     @property
+    def size(self) -> int:
+        return sum([layer.width for layer in self._layers]) + self.in_size
+
+    @property
     def width(self) -> int:
-        return max([layer.width for layer in self._layers]) if len(self._layers) else 0
-
-    @property
-    def in_size(self) -> int:
-        return self._layers[0].in_size if len(self._layers) else 0
-
-    @property
-    def out_size(self) -> int:
-        return self._layers[-1].width if len(self._layers) else 0
-
-    @property
-    def in_data(self) -> Optional[np.ndarray]:
-        return self._layers[0].in_data if len(self._layers) else None
-
-    @property
-    def out_data(self) -> Optional[np.ndarray]:
-        return self._layers[-1].out_data if len(self._layers) else None
+        return (
+            max([layer.width for layer in self._layers] + [self.in_size])
+            if len(self._layers) else 0
+        )
 
     @property
     def loss(self) -> Loss:
         return self._loss
 
     @property
-    def size(self) -> int:
-        return sum([layer.width for layer in self._layers])
+    def in_size(self) -> int:
+        return self._layers[0].in_size if len(self._layers) else None
 
-    # TODO
+    @property
+    def in_data(self) -> np.ndarray:
+        return self._layers[0].in_data if len(self._layers) else None
+
+    @property
+    def out_size(self) -> int:
+        return self._layers[-1].width if len(self._layers) else None
+
+    @property
+    def out_data(self) -> np.ndarray:
+        return self._layers[-1].out_data if len(self._layers) else None
+
     def __str__(self):
-        string = ""
-        for layer in self._layers:
-            string += (str(layer) + "\n")
-        return string
+        details = str(tabulate(
+            [
+                ["\033[1m TYPE \033[0m", self.__class__.__name__],
+                ["\033[1m NAME \033[0m", self.name],
+                ["\033[1m DEPTH \033[0m", self.depth],
+                ["\033[1m WIDTH \033[0m", self.width],
+                ["\033[1m SIZE \033[0m", self.size],
+                [
+                    "\033[1m IN_SIZE \033[0m",
+                    self.in_size if self.in_size is not None else "-"
+                ],
+                [
+                    "\033[1m OUT_SIZE \033[0m",
+                    self.out_size if self.out_size is not None else "-"
+                ],
+                ["\033[1m LOSS \033[0m", self.loss.function().__name__],
+                ["\033[1m BUILT\033[0m", self.is_built()]
+            ],
+            tablefmt="fancy_grid",
+            colalign=["center"] * 2
+        ))
+        layers = "\n".join([str(layer) for layer in self._layers])
+        structure = str(tabulate([[
+                self._layers[h].name if h != -1 else "-",
+                ("HIDDEN" if h != self.depth - 1 else "OUTPUT") if h != -1 else "INPUT",
+                self._layers[h].width if h != -1 else self.in_size,
+            ] for h in range(-1, self.depth)],
+            tablefmt="fancy_grid",
+            colalign=["center"] * 3
+        )) if len(self._layers) != 0 else ""
+        return str(tabulate(
+            [[
+                details,
+                layers if layers != "" else "-",
+                structure if structure != "" else "-"]],
+            headers=[
+                "\033[1m DETAILS \033[0m",
+                "\033[1m LAYERS \033[0m",
+                "\033[1m STRUCTURE \033[0m"
+            ],
+            tablefmt="fancy_grid",
+            colalign=["center"] * 3
+        ))
 
-"""
-from mnist import MNIST
+
 from layers import Dense
-from nndp.math.functions import Activation, Loss
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import precision_score
-from sklearn.metrics import recall_score
-from sklearn.metrics import f1_score
-
-
-def get_mnist_data(valid=None):
-    mdata = MNIST('../data/mnist', return_type='numpy')
-
-    train_data, train_labels = mdata.load_training()
-    test_data, test_labels = mdata.load_testing()
-    train_data = train_data.reshape((60000, 1, 28, 28))
-    test_data = test_data.reshape((10000, 1, 28, 28))
-
-    if valid is not None:
-        n_valid = int(valid * 60000)
-        indexes = np.array(range(60000))
-        np.random.shuffle(indexes)
-
-        valid_X = train_data[indexes[0:n_valid]]
-        valid_y = train_labels[indexes[0:n_valid]]
-        train_X = train_data[indexes[n_valid:]]
-        train_y = train_labels[indexes[n_valid:]]
-        return train_X, train_y, valid_X, valid_y, test_data, test_labels
-
-    return train_data, train_labels, test_data, test_labels
-
-
-train_X, train_y, valid_X, valid_y, test_X, test_y = get_mnist_data(valid=.25)
-test_X = test_X / 255 - .5
-train_X = train_X / 255 - .5
-valid_X = valid_X / 255 - .5
-
 
 nn = Sequential(
-    [
-        Dense(784, 10, Activation.SIGMOID),
-        Dense(10, 10, Activation.SIGMOID).build(),
-        Dense(10, 10, Activation.IDENTITY),
-    ],
-    Loss.CROSS_ENTROPY
 )
-nn.build()
 
-nn.fit(Set(X_train, t_train), n_batches=0, learning_rate=0.001, epochs=500)
-y_test = np.squeeze(np.array([nn.predict(test) for test in X_test]))
+nn.add_all([Dense(7), Dense(7),Dense(7),Dense(7),Dense(7),Dense(7)])
+nn.build(200)
 
-print(nn.predict(X_train[0]), t_train[0])
-"""
+print(nn)

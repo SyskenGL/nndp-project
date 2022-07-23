@@ -7,6 +7,12 @@ class IncompatibleLayersError(Exception):
         super().__init__(message)
 
 
+class EmptyModelError(Exception):
+
+    def __init__(self, message: str = None):
+        super().__init__(message)
+
+
 class NotBuiltError(Exception):
 
     def __init__(self, message: str = None):

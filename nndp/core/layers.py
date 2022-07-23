@@ -2,83 +2,80 @@
 from __future__ import annotations
 import uuid
 import numpy as np
-from enum import Enum, auto
 from tabulate import tabulate
-from nndp.utils.decorators import require_built
 from nndp.math.functions import Activation
-
-
-class Category(Enum):
-
-    HIDDEN = auto()
-    OUTPUT = auto()
+from nndp.utils.decorators import require_built
+from nndp.utils.decorators import require_not_built
 
 
 class Layer:
 
     def __init__(
         self,
-        in_size: int,
         width: int,
         activation: Activation = Activation.IDENTITY,
         name: str = None,
     ):
-        if in_size <= 0 or width <= 0:
-            attribute = "in_size" if in_size <= 0 else "width"
-            raise ValueError(f"{attribute} value must be greater than zero.")
-        self._in_size = in_size
+        if width <= 0:
+            raise ValueError(
+                f"expected width value greater than zero, received {width}."
+            )
+        self._name = (
+            name if name is not None
+            else f"{self.__class__.__name__}_{str(uuid.uuid4())[:8]}"
+        )
         self._width = width
         self._activation = activation
-        self._name = (
-            name if name else f"{self.__class__.__name__}_{str(uuid.uuid4())[:8]}"
-        )
-        self._category = None
+        self._in_size = None
         self._in_data = None
         self._in_weighted = None
         self._out_data = None
         self._weights = None
         self._biases = None
-        self._delta = None
-
-    def build(
-        self,
-        category: Category = Category.HIDDEN,
-        weights: np.ndarray = None,
-        biases: np.ndarray = None
-    ) -> Layer:
-        raise NotImplementedError
 
     def is_built(self) -> bool:
-        return self._weights is not None and self._biases is not None
+        return (
+            self._weights is not None and
+            self._biases is not None and
+            self._in_size is not None
+        )
 
+    @require_not_built
+    def build(
+        self,
+        in_size: int,
+        weights: np.ndarray = None,
+        biases: np.ndarray = None
+    ) -> None:
+        raise NotImplementedError
+
+    @require_built
     def forward_propagation(self, in_data: np.ndarray) -> np.ndarray:
         raise NotImplementedError
 
+    @require_built
     def backward_propagation(self, expected: np.ndarray) -> np.ndarray:
         raise NotImplementedError
 
+    @require_built
     def update(self, learning_rate: float = 0.001) -> None:
         raise NotImplementedError
 
     @property
-    def in_size(self) -> int:
-        return self._in_size
+    def name(self) -> str:
+        return self._name
 
     @property
     def width(self) -> int:
         return self._width
 
     @property
-    def category(self) -> Category:
-        return self._category
-
-    @property
     def activation(self) -> Activation:
         return self._activation
 
     @property
-    def name(self) -> str:
-        return self._name
+    def in_size(self) -> int:
+        return self._in_size
 
     @property
     def in_data(self) -> np.ndarray:
@@ -92,23 +89,25 @@ class Layer:
     def out_data(self) -> np.ndarray:
         return self._out_data
 
-    @property
-    def delta(self) -> np.ndarray:
-        return self._delta
-
     def __str__(self) -> str:
         return str(tabulate([[
-                self._category if self._category else "-",
-                self._name,
-                self._in_size,
-                self._width,
-                self._activation.function().__name__,
+                self.__class__.__name__,
+                self.name,
+                self.in_size if self.in_size is not None else "-",
+                self.width,
+                self.activation.function().__name__,
+                self.is_built()
             ]],
             headers=[
-                "category", "name", "in_size", "width", "activation"
+                "\033[1m TYPE \033[0m",
+                "\033[1m NAME \033[0m",
+                "\033[1m IN_SIZE \033[0m",
+                "\033[1m WIDTH \033[0m",
+                "\033[1m ACTIVATION \033[0m",
+                "\033[1m BUILT \033[0m"
             ],
             tablefmt="fancy_grid",
-            colalign=["center"]*5
+            colalign=["center"] * 6
         ))
 
 
@@ -116,43 +115,47 @@ class Dense(Layer):
 
     def __init__(
         self,
-        in_size: int,
         width: int,
-        activation: Activation = Activation.SIGMOID,
+        activation: Activation = Activation.IDENTITY,
         name: str = None,
     ):
-        super().__init__(in_size, width, activation, name)
+        super().__init__(width, activation, name)
+        self._delta = None
         self._accumulated_weights_delta = None
         self._accumulated_biases_delta = None
 
+    @require_not_built
     def build(
         self,
-        category: Category = Category.HIDDEN,
+        in_size: int,
         weights: np.ndarray = None,
         biases: np.ndarray = None
-    ) -> Dense:
-        if self.is_built():
-            return self
-        self._category = category
-        if weights is not None:
-            if (self._width, self._in_size) != weights.shape:
-                raise ValueError(
-                    f"provided shape {weights.shape} is not aligned with expected shape {self._weights.shape}."
-                )
-            self._weights = weights
-        else:
-            self._weights = np.random.randn(self._width, self._in_size)
-        if biases is not None:
-            if (self._width, self._in_size) != biases.shape:
-                raise ValueError(
-                    f"provided shape {biases.shape} is not aligned with expected shape {self.biases.shape}."
-                )
-            self._biases = biases
-        else:
-            self._biases = np.random.randn(self._width, 1)
-        self._accumulated_weights_delta = np.zeros((self._width, self._in_size))
-        self._accumulated_biases_delta = np.zeros((self._width, 1))
-        return self
+    ) -> None:
+        if in_size <= 0:
+            raise ValueError(
+                f"expected in_size value greater than zero, received {in_size}."
+            )
+        if weights is not None and (self._width, self._in_size) != weights.shape:
+            raise ValueError(
+                f"provided weights shape {weights.shape} "
+                f"is not aligned with expected shape {self._weights.shape}."
+            )
+        if biases is not None and (self._width, self._in_size) != biases.shape:
+            raise ValueError(
+                f"provided biases shape {biases.shape} "
+                f"is not aligned with expected shape {self.biases.shape}."
+            )
+        self._in_size = in_size
+        self._weights = (
+            weights if weights is not None
+            else np.random.randn(self._width, self._in_size)
+        )
+        self._biases = (
+            biases if biases is not None
+            else np.random.randn(self._width, 1)
+        )
+        self._accumulated_weights_delta = np.zeros(self._weights.shape)
+        self._accumulated_biases_delta = np.zeros(self._biases.shape)
 
     @require_built
     def forward_propagation(self, in_data: np.ndarray) -> np.ndarray:
@@ -175,5 +178,5 @@ class Dense(Layer):
         if learning_rate is not None:
             self._weights -= learning_rate * self._accumulated_weights_delta
             self._biases -= learning_rate * self._accumulated_biases_delta
-            self._accumulated_weights_delta = np.zeros((self._width, self._in_size))
-            self._accumulated_biases_delta = np.zeros((self._width, 1))
+            self._accumulated_weights_delta = np.zeros(self._weights.shape)
+            self._accumulated_biases_delta = np.zeros(self._biases.shape)
