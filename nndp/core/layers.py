@@ -58,7 +58,7 @@ class Layer:
         raise NotImplementedError
 
     @require_built
-    def update(self, learning_rate: float = 0.001) -> None:
+    def update(self, learning_rate: float = .001) -> None:
         raise NotImplementedError
 
     @property

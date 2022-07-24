@@ -68,8 +68,13 @@ class MLP:
     def add(self, layer: Layer) -> None:
         self._layers.append(layer)
 
+    @require_not_built
     def add_all(self, layers: list[Layer]) -> None:
         self._layers.extend(layers)
+
+    @require_not_built
+    def pop(self):
+        self._layers.pop()
 
     """
     @require_built
@@ -80,7 +85,7 @@ class MLP:
     def fit(
         self,
         training_set: Set,
-        learning_rate: float = 0.001,
+        learning_rate: float = .001,
         n_batches: int = 1,
         epochs: int = 500
     ) -> None:
@@ -108,7 +113,6 @@ class MLP:
                         else None
                     )
     
-
     @require_built
     def _forward_propagation(self, in_data: np.ndarray) -> None:
         for layer in self._layers:
