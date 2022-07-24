@@ -11,7 +11,7 @@ from nndp.utils.decorators import require_built
 from nndp.utils.decorators import require_not_built
 
 
-class Sequential:
+class MLP:
 
     def __init__(
         self,
@@ -152,7 +152,7 @@ class Sequential:
 
     @property
     def in_size(self) -> int:
-        return self._layers[0].in_size if len(self._layers) else None
+        return self._layers[0].in_size if len(self._layers) else 0
 
     @property
     def in_data(self) -> np.ndarray:
@@ -160,7 +160,7 @@ class Sequential:
 
     @property
     def out_size(self) -> int:
-        return self._layers[-1].width if len(self._layers) else None
+        return self._layers[-1].width if len(self._layers) else 0
 
     @property
     def out_data(self) -> np.ndarray:
@@ -176,11 +176,11 @@ class Sequential:
                 ["\033[1m SIZE \033[0m", self.size],
                 [
                     "\033[1m IN_SIZE \033[0m",
-                    self.in_size if self.in_size is not None else "-"
+                    self.in_size if self.in_size else "-"
                 ],
                 [
                     "\033[1m OUT_SIZE \033[0m",
-                    self.out_size if self.out_size is not None else "-"
+                    self.out_size if self.out_size else "-"
                 ],
                 ["\033[1m LOSS \033[0m", self.loss.function().__name__],
                 ["\033[1m BUILT\033[0m", self.is_built()]
@@ -192,7 +192,7 @@ class Sequential:
         structure = str(tabulate([[
                 self._layers[h].name if h != -1 else "-",
                 ("HIDDEN" if h != self.depth - 1 else "OUTPUT") if h != -1 else "INPUT",
-                self._layers[h].width if h != -1 else self.in_size,
+                self._layers[h].width if h != -1 else (self.in_size if self.in_size else "-"),
             ] for h in range(-1, self.depth)],
             tablefmt="fancy_grid",
             colalign=["center"] * 3
@@ -210,14 +210,3 @@ class Sequential:
             tablefmt="fancy_grid",
             colalign=["center"] * 3
         ))
-
-
-from layers import Dense
-
-nn = Sequential(
-)
-
-nn.add_all([Dense(7), Dense(7),Dense(7),Dense(7),Dense(7),Dense(7)])
-nn.build(200)
-
-print(nn)

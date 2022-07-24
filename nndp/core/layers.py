@@ -75,7 +75,7 @@ class Layer:
 
     @property
     def in_size(self) -> int:
-        return self._in_size
+        return self._in_size if self._in_size is not None else 0
 
     @property
     def in_data(self) -> np.ndarray:
@@ -93,7 +93,7 @@ class Layer:
         return str(tabulate([[
                 self.__class__.__name__,
                 self.name,
-                self.in_size if self.in_size is not None else "-",
+                self.in_size if self.in_size else "-",
                 self.width,
                 self.activation.function().__name__,
                 self.is_built()
