@@ -89,13 +89,26 @@ class Layer:
     def out_data(self) -> np.ndarray:
         return self._out_data
 
+    @property
+    def weights(self) -> np.ndarray:
+        return np.copy(self._weights)
+
+    @property
+    def biases(self) -> np.ndarray:
+        return np.copy(self._biases)
+
+    @property
+    def n_trainable(self) -> int:
+        return self._weights.size + self._biases.size if self.is_built() else 0
+
     def __str__(self) -> str:
         return str(tabulate([[
                 self.__class__.__name__,
-                self.name,
-                self.in_size if self.in_size else "-",
-                self.width,
-                self.activation.function().__name__,
+                self._name,
+                self._in_size if self._in_size else "-",
+                self._width,
+                self._activation.function().__name__,
+                self.n_trainable if self.is_built() else "-",
                 self.is_built()
             ]],
             headers=[
@@ -104,10 +117,11 @@ class Layer:
                 "\033[1m IN_SIZE \033[0m",
                 "\033[1m WIDTH \033[0m",
                 "\033[1m ACTIVATION \033[0m",
+                "\033[1m # TRAINABLE \033[0m",
                 "\033[1m BUILT \033[0m"
             ],
             tablefmt="fancy_grid",
-            colalign=["center"] * 6
+            colalign=["center"] * 7
         ))
 
 

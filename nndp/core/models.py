@@ -170,11 +170,22 @@ class MLP:
     def out_data(self) -> np.ndarray:
         return self._layers[-1].out_data if len(self._layers) else None
 
+    @property
+    def layers(self) -> tuple[Layer]:
+        return tuple(self._layers)
+
+    @property
+    def n_trainable(self) -> tuple[Layer]:
+        return (
+            sum([layer.weights.size + layer.biases.size for layer in self._layers])
+            if self.is_built() else 0
+        )
+
     def __str__(self):
         details = str(tabulate(
             [
                 ["\033[1m TYPE \033[0m", self.__class__.__name__],
-                ["\033[1m NAME \033[0m", self.name],
+                ["\033[1m NAME \033[0m", self._name],
                 ["\033[1m DEPTH \033[0m", self.depth],
                 ["\033[1m WIDTH \033[0m", self.width],
                 ["\033[1m SIZE \033[0m", self.size],
@@ -186,7 +197,11 @@ class MLP:
                     "\033[1m OUT_SIZE \033[0m",
                     self.out_size if self.out_size else "-"
                 ],
-                ["\033[1m LOSS \033[0m", self.loss.function().__name__],
+                ["\033[1m LOSS \033[0m", self._loss.function().__name__],
+                [
+                    "\033[1m TRAINABLE \033[0m",
+                    self.n_trainable if self.is_built() else "-"
+                ],
                 ["\033[1m BUILT\033[0m", self.is_built()]
             ],
             tablefmt="fancy_grid",
