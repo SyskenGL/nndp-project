@@ -175,7 +175,7 @@ class MLP:
         return tuple(self._layers)
 
     @property
-    def n_trainable(self) -> tuple[Layer]:
+    def total_trainable(self) -> tuple[Layer]:
         return (
             sum([layer.weights.size + layer.biases.size for layer in self._layers])
             if self.is_built() else 0
@@ -199,8 +199,8 @@ class MLP:
                 ],
                 ["\033[1m LOSS \033[0m", self._loss.function().__name__],
                 [
-                    "\033[1m TRAINABLE \033[0m",
-                    self.n_trainable if self.is_built() else "-"
+                    "\033[1m # TRAINABLE \033[0m",
+                    self.total_trainable if self.is_built() else "-"
                 ],
                 ["\033[1m BUILT\033[0m", self.is_built()]
             ],
@@ -210,8 +210,10 @@ class MLP:
         layers = "\n".join([str(layer) for layer in self._layers])
         structure = str(tabulate([[
                 self._layers[h].name if h != -1 else "-",
-                ("HIDDEN" if h != self.depth - 1 else "OUTPUT") if h != -1 else "INPUT",
-                self._layers[h].width if h != -1 else (self.in_size if self.in_size else "-"),
+                ("HIDDEN" if h != self.depth - 1 else "OUTPUT")
+                if h != -1 else "INPUT",
+                self._layers[h].width if h != -1
+                else (self.in_size if self.in_size else "-"),
             ] for h in range(-1, self.depth)],
             tablefmt="fancy_grid",
             colalign=["center"] * 3

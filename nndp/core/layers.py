@@ -98,7 +98,7 @@ class Layer:
         return np.copy(self._biases)
 
     @property
-    def n_trainable(self) -> int:
+    def total_trainable(self) -> int:
         return self._weights.size + self._biases.size if self.is_built() else 0
 
     def __str__(self) -> str:
@@ -108,7 +108,7 @@ class Layer:
                 self._in_size if self._in_size else "-",
                 self._width,
                 self._activation.function().__name__,
-                self.n_trainable if self.is_built() else "-",
+                self.total_trainable if self.is_built() else "-",
                 self.is_built()
             ]],
             headers=[
@@ -149,17 +149,17 @@ class Dense(Layer):
             raise ValueError(
                 f"expected in_size value greater than zero, received {in_size}."
             )
+        self._in_size = in_size
         if weights is not None and (self._width, self._in_size) != weights.shape:
             raise ValueError(
                 f"provided weights shape {weights.shape} "
-                f"is not aligned with expected shape {self._weights.shape}."
+                f"is not aligned with expected shape {(self._width, self._in_size)}."
             )
-        if biases is not None and (self._width, self._in_size) != biases.shape:
+        if biases is not None and (self._width, 1) != biases.shape:
             raise ValueError(
                 f"provided biases shape {biases.shape} "
-                f"is not aligned with expected shape {self.biases.shape}."
+                f"is not aligned with expected shape {(self._width, 1)}."
             )
-        self._in_size = in_size
         self._weights = (
             weights if weights is not None
             else np.random.randn(self._width, self._in_size)
@@ -183,7 +183,7 @@ class Dense(Layer):
     def backward_propagation(self, delta: np.ndarray) -> np.ndarray:
         delta = np.reshape(delta, (-1, 1))
         self._delta = self._activation.prime()(self._in_weighted) * delta
-        return self._weights.T @ delta
+        return self._weights.T @ self._delta
 
     @require_built
     def update(self, learning_rate: float = None) -> None:
