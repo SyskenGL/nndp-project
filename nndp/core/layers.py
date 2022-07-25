@@ -98,7 +98,7 @@ class Layer:
         return np.copy(self._biases)
 
     @property
-    def total_trainable(self) -> int:
+    def n_trainable(self) -> int:
         return self._weights.size + self._biases.size if self.is_built() else 0
 
     def __str__(self) -> str:
@@ -108,7 +108,7 @@ class Layer:
                 self._in_size if self._in_size else "-",
                 self._width,
                 self._activation.function().__name__,
-                self.total_trainable if self.is_built() else "-",
+                self.n_trainable if self.is_built() else "-",
                 self.is_built()
             ]],
             headers=[

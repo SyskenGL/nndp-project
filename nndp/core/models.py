@@ -129,6 +129,7 @@ class MLP:
     def _update(self, learning_rate) -> None:
         for layer in self._layers:
             layer.update(learning_rate)
+
     """
 
     @property
@@ -175,7 +176,7 @@ class MLP:
         return tuple(self._layers)
 
     @property
-    def total_trainable(self) -> tuple[Layer]:
+    def n_trainable(self) -> tuple[Layer]:
         return (
             sum([layer.weights.size + layer.biases.size for layer in self._layers])
             if self.is_built() else 0
@@ -200,7 +201,7 @@ class MLP:
                 ["\033[1m LOSS \033[0m", self._loss.function().__name__],
                 [
                     "\033[1m # TRAINABLE \033[0m",
-                    self.total_trainable if self.is_built() else "-"
+                    self.n_trainable if self.is_built() else "-"
                 ],
                 ["\033[1m BUILT\033[0m", self.is_built()]
             ],
@@ -231,3 +232,128 @@ class MLP:
             tablefmt="fancy_grid",
             colalign=["center"] * 3
         ))
+
+"""
+from mnist import MNIST
+from layers import Dense
+from nndp.math.functions import Activation, Loss
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import precision_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import f1_score
+
+def get_mnist_data(data):
+    data = np.array(data)
+    data = np.transpose(data)
+    return data
+
+def get_mnist_labels(labels):
+    labels = np.array(labels)
+    one_hot_labels = np.zeros((10, labels.shape[0]), dtype=int)
+
+    for n in range(labels.shape[0]):
+        label = labels[n]
+        one_hot_labels[label][n] = 1
+
+    return one_hot_labels
+
+def get_random_dataset(X, t, n_samples=10000):
+    if X.shape[1] < n_samples:
+        raise ValueError
+
+    n_tot_samples = X.shape[1]
+    n_samples_not_considered = n_tot_samples - n_samples
+
+    new_dataset = np.array([1] * n_samples + [0] * n_samples_not_considered)
+    np.random.shuffle(new_dataset)
+
+    index = np.where(new_dataset == 1)
+    index = np.reshape(index, -1)
+
+    new_X = X[:, index]
+    new_t = t[:, index]
+
+    return new_X, new_t
+
+def get_scaled_data(X):
+    X = X.astype('float32')
+    X = X / 255.0
+    return X
+
+def train_test_split(X, t, test_size=0.25):
+    n_samples = X.shape[1]
+    test_size = int(n_samples * test_size)
+    train_size = n_samples - test_size
+
+    dataset = np.array([1] * train_size + [0] * test_size)
+    np.random.shuffle(dataset)
+
+    train_index = np.where(dataset == 1)
+    train_index = np.reshape(train_index, -1)
+
+    X_train = X[:, train_index]
+    t_train = t[:, train_index]
+
+    test_index = np.where(dataset == 0)
+    test_index = np.reshape(test_index, -1)
+
+    X_test = X[:, test_index]
+    t_test = t[:, test_index]
+
+    return X_train, X_test, t_train, t_test
+
+def get_metric_value(y, t, metric):
+    pred = np.argmax(y, axis=0)
+    target = np.argmax(t, axis=0)
+
+    pred = pred.tolist()
+    target = target.tolist()
+
+    if metric == 'accuracy':
+        return accuracy_score(pred, target)
+    elif metric == 'precision':
+        return precision_score(pred, target, average='macro', zero_division=0)
+    elif metric == 'recall':
+        return recall_score(pred, target, average='macro', zero_division=0)
+    elif metric == 'f1':
+        return f1_score(pred, target, average='macro', zero_division=0)
+
+    raise ValueError()
+
+def print_result(y_test, t_test):
+    accuracy = get_metric_value(y_test, t_test, 'accuracy')
+    precision = get_metric_value(y_test, t_test, 'precision')
+    recall = get_metric_value(y_test, t_test, 'recall')
+    f1 = get_metric_value(y_test, t_test, 'f1')
+
+    print('\n')
+    print('-'*63)
+    print('Performance on test set\n')
+    print('     accuracy: {:.2f} - precision: {:.2f} - recall: {:.2f} - f1: {:.2f}\n\n'.format(accuracy, precision, recall, f1))
+
+mndata = MNIST('../data/mnist')
+X, t = mndata.load_training()
+X = get_mnist_data(X)
+t = get_mnist_labels(t)
+
+X, t = get_random_dataset(X, t, n_samples=1000)
+X = get_scaled_data(X)
+
+X_train, X_test, t_train, t_test = train_test_split(X, t, test_size=0.25)
+X_train, X_test, t_train, t_test = X_train.T, X_test.T, t_train.T, t_test.T
+
+nn = MLP(
+    [
+        Dense(10, Activation.SIGMOID),
+        Dense(10, Activation.SIGMOID),
+        Dense(10, Activation.IDENTITY),
+    ],
+    Loss.CROSS_ENTROPY
+)
+nn.build(784)
+
+nn.fit(Set(X_train, t_train), n_batches=0, learning_rate=0.1, epochs=500)
+y_test = np.squeeze(np.array([nn.predict(test) for test in X_test]))
+print_result(y_test, t_test)
+print(nn.predict(X_train[0]), t_train[0])
+"""
