@@ -92,7 +92,7 @@ class MLP:
         if not 0 <= learning_rate <= 1:
             raise ValueError("learning rate must be in [0, 1].")
         if not (0 <= n_batches <= training_set.size):
-            raise ValueError(f"n_batches must be in (0, {training_set.size}].")
+            raise ValueError(f"n_batches must be in [0, {training_set.size}].")
         batches = [
             Set(data, labels)
             for data, labels in
@@ -131,6 +131,7 @@ class MLP:
             layer.update(learning_rate)
 
     """
+
 
     @property
     def name(self) -> str:
@@ -352,7 +353,7 @@ nn = MLP(
 )
 nn.build(784)
 
-nn.fit(Set(X_train, t_train), n_batches=0, learning_rate=0.1, epochs=500)
+nn.fit(Set(X_train, t_train), n_batches=0, learning_rate=0.001, epochs=5000)
 y_test = np.squeeze(np.array([nn.predict(test) for test in X_test]))
 print_result(y_test, t_test)
 print(nn.predict(X_train[0]), t_train[0])
