@@ -76,50 +76,6 @@ class MLP:
     def pop(self):
         self._layers.pop()
 
-    """
-    @require_built
-    def predict(self, in_data: np.ndarray) -> np.ndarray:
-        self._forward_propagation(in_data)
-        return self.out_data
-
-    def fit(
-        self,
-        training_set: Set,
-        learning_rate: float = .001,
-        n_batches: int = 1,
-        epochs: int = 500
-    ) -> None:
-        if not 0 <= learning_rate <= 1:
-            raise ValueError("learning rate must be in [0, 1].")
-        if not (0 <= n_batches <= training_set.size):
-            raise ValueError(f"n_batches must be in [0, {training_set.size}].")
-        batches = [
-            Set(data, labels)
-            for data, labels in
-            zip(
-                np.array_split(training_set.data, n_batches),
-                np.array_split(training_set.labels, n_batches)
-            )
-        ] if n_batches not in [0, 1] else [training_set]
-        for epoch in range(0, epochs):
-            print(f"Epoch #{epoch}.")
-            for batch in batches:
-                for instance in range(0, batch.size):
-                    self._forward_propagation(batch.data[instance])
-                    self._backward_propagation(batch.labels[instance])
-                    self._update(
-                        learning_rate
-                        if (n_batches == 0 or instance == batch.size - 1)
-                        else None
-                    )
-    
-    @require_built
-    def _update(self, learning_rate) -> None:
-        for layer in self._layers:
-            layer.update(learning_rate)
-
-    """
-
     @require_built
     def _forward_propagation(self, in_data: np.ndarray) -> None:
         for layer in self._layers:
@@ -232,6 +188,51 @@ class MLP:
             tablefmt="fancy_grid",
             colalign=["center"] * 3
         ))
+
+
+"""
+@require_built
+def predict(self, in_data: np.ndarray) -> np.ndarray:
+    self._forward_propagation(in_data)
+    return self.out_data
+
+def fit(
+    self,
+    training_set: Set,
+    learning_rate: float = .001,
+    n_batches: int = 1,
+    epochs: int = 500
+) -> None:
+    if not 0 <= learning_rate <= 1:
+        raise ValueError("learning rate must be in [0, 1].")
+    if not (0 <= n_batches <= training_set.size):
+        raise ValueError(f"n_batches must be in [0, {training_set.size}].")
+    batches = [
+        Set(data, labels)
+        for data, labels in
+        zip(
+            np.array_split(training_set.data, n_batches),
+            np.array_split(training_set.labels, n_batches)
+        )
+    ] if n_batches not in [0, 1] else [training_set]
+    for epoch in range(0, epochs):
+        print(f"Epoch #{epoch}.")
+        for batch in batches:
+            for instance in range(0, batch.size):
+                self._forward_propagation(batch.data[instance])
+                self._backward_propagation(batch.labels[instance])
+                self._update(
+                    learning_rate
+                    if (n_batches == 0 or instance == batch.size - 1)
+                    else None
+                )
+
+@require_built
+def _update(self, learning_rate) -> None:
+    for layer in self._layers:
+        layer.update(learning_rate)
+
+"""
 
 
 """
