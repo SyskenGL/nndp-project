@@ -60,8 +60,8 @@ class MLP:
         for h in range(0, self.depth):
             self._layers[h].build(
                 self._layers[h - 1].width if h != 0 else in_size,
-                weights[0] if weights else None,
-                biases[0] if biases else None
+                weights[h] if weights else None,
+                biases[h] if biases else None
             )
 
     @require_not_built
@@ -114,6 +114,13 @@ class MLP:
                     )
     
     @require_built
+    def _update(self, learning_rate) -> None:
+        for layer in self._layers:
+            layer.update(learning_rate)
+
+    """
+
+    @require_built
     def _forward_propagation(self, in_data: np.ndarray) -> None:
         for layer in self._layers:
             in_data = layer.forward_propagation(in_data)
@@ -124,14 +131,6 @@ class MLP:
         delta = self._loss.prime()(self.out_data, expected)
         for layer in reversed(self._layers):
             delta = layer.backward_propagation(delta)
-
-    @require_built
-    def _update(self, learning_rate) -> None:
-        for layer in self._layers:
-            layer.update(learning_rate)
-
-    """
-
 
     @property
     def name(self) -> str:
@@ -234,7 +233,36 @@ class MLP:
             colalign=["center"] * 3
         ))
 
+
 """
+
+from layers import Dense
+from nndp.math.functions import Activation
+
+mlp = MLP([
+    Dense(2, Activation.SIGMOID),
+    Dense(3, Activation.SIGMOID)
+])
+weights = [
+    np.array([[-0.02231122, -0.10919746,  0.07450828],
+ [-0.0025994,  -0.03248617, -0.02875975]]
+),
+    np.array([[-0.04484072,  0.05372628],
+ [ 0.05604744,  0.11775328],
+ [ 0.09757671,  0.03080518]]
+)
+]
+biases = [
+    np.array([[-0.0469785359818356], [-0.0469785359818356]]),
+    np.array([[-0.144365218079866], [-0.144365218079866], [-0.144365218079866]])
+]
+mlp.build(3, weights, biases)
+mlp._forward_propagation(np.array([1, 2, 3]))
+mlp._backward_propagation(np.array([7,8,7]))
+print(mlp.out_data)
+for layer in mlp.layers:
+    print(layer._delta)
+
 from mnist import MNIST
 from layers import Dense
 from nndp.math.functions import Activation, Loss
