@@ -235,34 +235,44 @@ def _update(self, learning_rate) -> None:
 """
 
 
-"""
 
+"""
 from layers import Dense
 from nndp.math.functions import Activation
 
 mlp = MLP([
     Dense(2, Activation.SIGMOID),
-    Dense(3, Activation.SIGMOID)
+    Dense(3, Activation.SIGMOID),
+    Dense(5, Activation.SIGMOID)
 ])
 weights = [
-    np.array([[-0.02231122, -0.10919746,  0.07450828],
- [-0.0025994,  -0.03248617, -0.02875975]]
+    np.array([[ 0.13005807,  0.02101538,  0.14593962],
+ [-0.04666016,  0.04843426,  0.07204504]]
 ),
-    np.array([[-0.04484072,  0.05372628],
- [ 0.05604744,  0.11775328],
- [ 0.09757671,  0.03080518]]
+    np.array([[-0.07656017,  0.09806878],
+ [-0.13445185, -0.09800845],
+ [-0.08889463,  0.07336609]]
+),
+np.array([[ 0.11682499,  0.04800587,  0.02316455],
+ [-0.03140125, -0.10265644, -0.14283609],
+ [-0.11136973 , 0.12718407,  0.05443523],
+ [ 0.06288628 , 0.15293911,  0.12954294],
+ [-0.1182643,  -0.05979394,  0.01845966]]
 )
 ]
 biases = [
-    np.array([[-0.0469785359818356], [-0.0469785359818356]]),
-    np.array([[-0.144365218079866], [-0.144365218079866], [-0.144365218079866]])
+    np.array([[-0.09693616802263261], [-0.09693616802263261]]),
+    np.array([[-0.04355394675638215], [-0.04355394675638215], [-0.04355394675638215]]),
+    np.array([[-0.014300785884413006], [-0.014300785884413006], [-0.014300785884413006], [-0.014300785884413006], [-0.014300785884413006]])
 ]
+
 mlp.build(3, weights, biases)
 mlp._forward_propagation(np.array([1, 2, 3]))
-mlp._backward_propagation(np.array([7,8,7]))
+mlp._backward_propagation(np.array([7,7,7,5,5]))
 print(mlp.out_data)
 for layer in mlp.layers:
     print(layer._delta)
+
 
 from mnist import MNIST
 from layers import Dense

@@ -258,7 +258,8 @@ class NeuralNetwork:
 nn = NeuralNetwork(target_epochs=500)
 nn.add_all([
     FullyConnectedLayer(3, 2, sigmoid),
-    FullyConnectedLayer(2, 3, sigmoid)
+    FullyConnectedLayer(2, 3, sigmoid),
+    FullyConnectedLayer(3, 5, sigmoid)
 ])
 for layer in nn.layers:
     print("----------------------------------------")
@@ -266,7 +267,8 @@ for layer in nn.layers:
     print(layer.bias)
     print("----------------------------------------")
 
-nn._back_prop(np.array([1, 2, 3]), np.array([7, 8, 7]))
+print(nn._forw_prop(np.array([1, 2, 3])))
+nn._back_prop(np.array([1, 2, 3]), np.array([7, 7, 7, 5, 5]))
 
 for layer in nn.layers:
     print("##########################################")
