@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import numpy as np
 from enum import Enum
-from scipy.special import softmax
 
 
 def identity(x: np.ndarray) -> np.ndarray:
@@ -37,28 +36,31 @@ def tanh_prime(x: np.ndarray) -> np.ndarray:
     return 1 - tanh(x)**2
 
 
-def sse(y: np.ndarray, t: np.ndarray) -> float:
+def softmax(x: np.ndarray) -> np.ndarray:
+    return np.exp(x - np.max(x)) / np.sum(np.exp(x - np.max(x)))
+
+
+def sse(y: np.ndarray, t: np.ndarray) -> np.ndarray:
     return 0.5 * np.sum(np.power(y - t, 2))
 
 
-def sse_prime(y: np.ndarray, t: np.ndarray):
+def sse_prime(y: np.ndarray, t: np.ndarray) -> np.ndarray:
     return y - t
 
 
-def cross_entropy(y: np.ndarray, t: np.ndarray, epsilon=1e-12) -> float:
-    y = np.clip(y, epsilon, 1. - epsilon)
+def cross_entropy(y: np.ndarray, t: np.ndarray) -> np.ndarray:
     return - np.sum(t * np.log(y))
 
 
-def cross_entropy_prime(y: np.ndarray, t: np.ndarray) -> float:
+def cross_entropy_prime(y: np.ndarray, t: np.ndarray) -> np.ndarray:
     return - t / y
 
 
-def softmax_cross_entropy(y: np.ndarray, t: np.ndarray) -> float:
+def softmax_cross_entropy(y: np.ndarray, t: np.ndarray) -> np.ndarray:
     return cross_entropy(softmax(y), t)
 
 
-def softmax_cross_entropy_prime(y: np.ndarray, t: np.ndarray) -> float:
+def softmax_cross_entropy_prime(y: np.ndarray, t: np.ndarray) -> np.ndarray:
     return softmax(y) - t
 
 
