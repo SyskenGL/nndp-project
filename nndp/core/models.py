@@ -3,10 +3,9 @@ from __future__ import annotations
 import uuid
 import numpy as np
 from tabulate import tabulate
-from nndp.math.functions import Loss
 from nndp.core.layers import Layer
-from nndp.utils.collections import Set
 from nndp.errors import EmptyModelError
+from nndp.utils.functions import Loss
 from nndp.utils.decorators import require_built
 from nndp.utils.decorators import require_not_built
 
@@ -65,21 +64,25 @@ class MLP:
             )
 
     @require_not_built
-    def add(self, layer: Layer) -> None:
+    def push(self, layer: Layer) -> None:
         self._layers.append(layer)
-
-    @require_not_built
-    def add_all(self, layers: list[Layer]) -> None:
-        self._layers.extend(layers)
 
     @require_not_built
     def pop(self):
         self._layers.pop()
 
     @require_built
-    def _forward_propagation(self, in_data: np.ndarray) -> None:
+    def predict(self, in_data: np.ndarray) -> np.ndarray:
+        out_data = in_data
         for layer in self._layers:
-            in_data = layer.forward_propagation(in_data)
+            out_data = layer.predict(out_data)
+        return out_data
+
+    @require_built
+    def _forward_propagation(self, in_data: np.ndarray) -> None:
+        out_data = in_data
+        for layer in self._layers:
+            out_data = layer.forward_propagation(out_data)
 
     @require_built
     def _backward_propagation(self, expected: np.ndarray) -> None:
@@ -87,6 +90,11 @@ class MLP:
         delta = self._loss.prime()(self.out_data, expected)
         for layer in reversed(self._layers):
             delta = layer.backward_propagation(delta)
+
+    @require_built
+    def _update(self, learning_rate) -> None:
+        for layer in self._layers:
+            layer.update(learning_rate)
 
     @property
     def name(self) -> str:
@@ -192,9 +200,6 @@ class MLP:
 
 """
 @require_built
-def predict(self, in_data: np.ndarray) -> np.ndarray:
-    self._forward_propagation(in_data)
-    return self.out_data
 
 def fit(
     self,
@@ -227,173 +232,4 @@ def fit(
                     else None
                 )
 
-@require_built
-def _update(self, learning_rate) -> None:
-    for layer in self._layers:
-        layer.update(learning_rate)
-
-"""
-
-
-
-"""
-from layers import Dense
-from nndp.math.functions import Activation
-
-mlp = MLP([
-    Dense(2, Activation.SIGMOID),
-    Dense(3, Activation.SIGMOID),
-    Dense(5, Activation.SIGMOID)
-])
-weights = [
-    np.array([[ 0.13005807,  0.02101538,  0.14593962],
- [-0.04666016,  0.04843426,  0.07204504]]
-),
-    np.array([[-0.07656017,  0.09806878],
- [-0.13445185, -0.09800845],
- [-0.08889463,  0.07336609]]
-),
-np.array([[ 0.11682499,  0.04800587,  0.02316455],
- [-0.03140125, -0.10265644, -0.14283609],
- [-0.11136973 , 0.12718407,  0.05443523],
- [ 0.06288628 , 0.15293911,  0.12954294],
- [-0.1182643,  -0.05979394,  0.01845966]]
-)
-]
-biases = [
-    np.array([[-0.09693616802263261], [-0.09693616802263261]]),
-    np.array([[-0.04355394675638215], [-0.04355394675638215], [-0.04355394675638215]]),
-    np.array([[-0.014300785884413006], [-0.014300785884413006], [-0.014300785884413006], [-0.014300785884413006], [-0.014300785884413006]])
-]
-
-mlp.build(3, weights, biases)
-mlp._forward_propagation(np.array([1, 2, 3]))
-mlp._backward_propagation(np.array([7,7,7,5,5]))
-print(mlp.out_data)
-for layer in mlp.layers:
-    print(layer._delta)
-
-
-from mnist import MNIST
-from layers import Dense
-from nndp.math.functions import Activation, Loss
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import precision_score
-from sklearn.metrics import recall_score
-from sklearn.metrics import f1_score
-
-def get_mnist_data(data):
-    data = np.array(data)
-    data = np.transpose(data)
-    return data
-
-def get_mnist_labels(labels):
-    labels = np.array(labels)
-    one_hot_labels = np.zeros((10, labels.shape[0]), dtype=int)
-
-    for n in range(labels.shape[0]):
-        label = labels[n]
-        one_hot_labels[label][n] = 1
-
-    return one_hot_labels
-
-def get_random_dataset(X, t, n_samples=10000):
-    if X.shape[1] < n_samples:
-        raise ValueError
-
-    n_tot_samples = X.shape[1]
-    n_samples_not_considered = n_tot_samples - n_samples
-
-    new_dataset = np.array([1] * n_samples + [0] * n_samples_not_considered)
-    np.random.shuffle(new_dataset)
-
-    index = np.where(new_dataset == 1)
-    index = np.reshape(index, -1)
-
-    new_X = X[:, index]
-    new_t = t[:, index]
-
-    return new_X, new_t
-
-def get_scaled_data(X):
-    X = X.astype('float32')
-    X = X / 255.0
-    return X
-
-def train_test_split(X, t, test_size=0.25):
-    n_samples = X.shape[1]
-    test_size = int(n_samples * test_size)
-    train_size = n_samples - test_size
-
-    dataset = np.array([1] * train_size + [0] * test_size)
-    np.random.shuffle(dataset)
-
-    train_index = np.where(dataset == 1)
-    train_index = np.reshape(train_index, -1)
-
-    X_train = X[:, train_index]
-    t_train = t[:, train_index]
-
-    test_index = np.where(dataset == 0)
-    test_index = np.reshape(test_index, -1)
-
-    X_test = X[:, test_index]
-    t_test = t[:, test_index]
-
-    return X_train, X_test, t_train, t_test
-
-def get_metric_value(y, t, metric):
-    pred = np.argmax(y, axis=0)
-    target = np.argmax(t, axis=0)
-
-    pred = pred.tolist()
-    target = target.tolist()
-
-    if metric == 'accuracy':
-        return accuracy_score(pred, target)
-    elif metric == 'precision':
-        return precision_score(pred, target, average='macro', zero_division=0)
-    elif metric == 'recall':
-        return recall_score(pred, target, average='macro', zero_division=0)
-    elif metric == 'f1':
-        return f1_score(pred, target, average='macro', zero_division=0)
-
-    raise ValueError()
-
-def print_result(y_test, t_test):
-    accuracy = get_metric_value(y_test, t_test, 'accuracy')
-    precision = get_metric_value(y_test, t_test, 'precision')
-    recall = get_metric_value(y_test, t_test, 'recall')
-    f1 = get_metric_value(y_test, t_test, 'f1')
-
-    print('\n')
-    print('-'*63)
-    print('Performance on test set\n')
-    print('     accuracy: {:.2f} - precision: {:.2f} - recall: {:.2f} - f1: {:.2f}\n\n'.format(accuracy, precision, recall, f1))
-
-mndata = MNIST('../data/mnist')
-X, t = mndata.load_training()
-X = get_mnist_data(X)
-t = get_mnist_labels(t)
-
-X, t = get_random_dataset(X, t, n_samples=1000)
-X = get_scaled_data(X)
-
-X_train, X_test, t_train, t_test = train_test_split(X, t, test_size=0.25)
-X_train, X_test, t_train, t_test = X_train.T, X_test.T, t_train.T, t_test.T
-
-nn = MLP(
-    [
-        Dense(10, Activation.SIGMOID),
-        Dense(10, Activation.SIGMOID),
-        Dense(10, Activation.IDENTITY),
-    ],
-    Loss.CROSS_ENTROPY
-)
-nn.build(784)
-
-nn.fit(Set(X_train, t_train), n_batches=0, learning_rate=0.001, epochs=5000)
-y_test = np.squeeze(np.array([nn.predict(test) for test in X_test]))
-print_result(y_test, t_test)
-print(nn.predict(X_train[0]), t_train[0])
 """

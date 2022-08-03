@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 import numpy as np
 from tabulate import tabulate
-from nndp.math.functions import Activation
+from nndp.utils.functions import Activation
 from nndp.utils.decorators import require_built
 from nndp.utils.decorators import require_not_built
 
@@ -184,6 +184,12 @@ class Dense(Layer):
         delta = np.reshape(delta, (-1, 1))
         self._delta = self._activation.prime()(self._in_weighted) * delta
         return self._weights.T @ self._delta
+
+    @require_built
+    def predict(self, in_data: np.ndarray) -> np.ndarray:
+        in_data = np.reshape(in_data, (-1, 1))
+        in_weighted = self._weights @ in_data + self._biases
+        return self._activation.function()(in_weighted)
 
     @require_built
     def update(self, learning_rate: float = None) -> None:

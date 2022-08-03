@@ -48,7 +48,8 @@ def sse_prime(y: np.ndarray, t: np.ndarray) -> np.ndarray:
     return y - t
 
 
-def cross_entropy(y: np.ndarray, t: np.ndarray) -> np.ndarray:
+def cross_entropy(y: np.ndarray, t: np.ndarray, epsilon: float = 1e-15) -> np.ndarray:
+    y = np.clip(y, epsilon, 1. - epsilon)
     return - np.sum(t * np.log(y))
 
 
