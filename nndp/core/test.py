@@ -216,7 +216,7 @@ class NeuralNetwork:
     def predict(self, x):
         ret = []
         for i in range(x.shape[0]):
-            ret.append(np.argmax(self._forw_prop(x[i, :])))
+            ret.append(self._forw_prop(x[i, :]))
         return np.array(ret)
 
     def _forw_prop(self, x):  # propago x per ogni layer
@@ -261,16 +261,5 @@ nn.add_all([
     FullyConnectedLayer(2, 3, sigmoid),
     FullyConnectedLayer(3, 5, sigmoid)
 ])
-for layer in nn.layers:
-    print("----------------------------------------")
-    print(layer.weights)
-    print(layer.bias)
-    print("----------------------------------------")
 
-print(nn._forw_prop(np.array([1, 2, 3])))
-nn._back_prop(np.array([1, 2, 3]), np.array([7, 7, 7, 5, 5]))
-
-for layer in nn.layers:
-    print("##########################################")
-    print(layer._delta)
-    print("##########################################")
+print(nn.predict(np.array([[1, 2, 3], [1, 1, 1], [1, 4, 3]])))

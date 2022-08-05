@@ -5,6 +5,7 @@ import numpy as np
 from tabulate import tabulate
 from nndp.core.layers import Layer
 from nndp.errors import EmptyModelError
+from nndp.utils.collections import Set
 from nndp.utils.functions import Loss
 from nndp.utils.decorators import require_built
 from nndp.utils.decorators import require_not_built
@@ -77,6 +78,90 @@ class MLP:
         for layer in self._layers:
             out_data = layer.predict(out_data)
         return out_data
+
+    @require_built
+    def fit(
+        self,
+        training_set: Set,
+        validation_set: Set = None,
+        learning_rate: float = .001,
+        n_batches: int = 1,
+        epochs: int = 500,
+        target_training_loss: float = None,
+        target_validation_loss: float = None,
+        target_training_accuracy: float = None,
+        target_validation_accuracy: float = None,
+    ) -> np.ndarray:
+
+        if training_set.size == 0:
+            raise ValueError("provided an empty training set.")
+        if validation_set and validation_set.size == 0:
+            raise ValueError("provided an empty validation set.")
+        if not validation_set and (target_validation_loss or target_validation_accuracy):
+            raise ValueError(f"expected a validation set.")
+
+        if not 0 < learning_rate <= 1:
+            raise ValueError("learning_rate must be in (0, 1].")
+        if not 0 <= n_batches <= training_set.size:
+            raise ValueError(f"n_batches must be in [0, {training_set.size}].")
+        if epochs <= 0:
+            raise ValueError(f"epochs must be greater than 0.")
+
+        if target_training_loss and not 0 < target_training_loss < 1:
+            raise ValueError("target_training_loss must be in (0, 1).")
+        if target_validation_loss and not 0 < target_validation_loss < 1:
+            raise ValueError("target_validation_loss must be in (0, 1).")
+        if target_training_accuracy and not 0 < target_training_accuracy < 1:
+            raise ValueError("target_training_accuracy must be in (0, 1).")
+        if target_validation_accuracy and not 0 < target_validation_accuracy < 1:
+            raise ValueError("target_validation_accuracy must be in (0, 1).")
+
+        stats = []
+        batches = [
+            Set(data, labels)
+            for data, labels in
+            zip(
+                np.array_split(training_set.data, n_batches),
+                np.array_split(training_set.labels, n_batches)
+            )
+        ] if n_batches not in [0, 1] else [training_set]
+
+        for epoch in range(0, epochs):
+            for batch in batches:
+                for instance in range(0, batch.size):
+                    self._forward_propagation(batch.data[instance])
+                    self._backward_propagation(batch.labels[instance])
+                    self._update(
+                        learning_rate
+                        if (n_batches == 0 or instance == batch.size - 1)
+                        else None
+                    )
+
+            training_predictions = np.array([self.predict(x) for x in training_set.data])
+            validation_predictions = np.array([
+                self.predict(x) for x in validation_set.data
+            ]) if validation_set else None
+
+            training_loss = self._loss.function()(training_predictions, training_set.labels)
+            validation_loss = self._loss.function()(
+                validation_predictions, validation_set.labels
+            ) if validation_set else None
+
+            # TODO accuracy
+            training_accuracy = None
+            validation_accuracy = None
+
+            # TODO exit
+
+            stats.append((
+                epoch,
+                training_loss,
+                validation_loss,
+                training_accuracy,
+                validation_accuracy
+            ))
+
+        return np.array(stats)
 
     @require_built
     def _forward_propagation(self, in_data: np.ndarray) -> None:
@@ -198,9 +283,46 @@ class MLP:
         ))
 
 
+from layers import Dense
+from nndp.utils.functions import sse
+
+
+def one_hot(y):  # 1 in corrispondenza della 'parola', 0 altrimenti
+    n_class = np.max(y) + 1
+    oh = np.zeros((y.shape[0], n_class))
+    for i in range(y.shape[0]):
+        oh[i, y[i]] = 1
+    return oh
+
+print(one_hot(np.array([1, 2, 3, 4])))
+
+mlp = MLP([
+    Dense(5),
+    Dense(5)
+])
+
+mlp.build(2)
+
+predicted_training = np.array([mlp.predict(x) for x in np.array([[1, 1],[1, 1],[1, 1],[1, 1]])])
+print(predicted_training)
+
+mlp.fit(Set(np.array([1]), np.array([1])), n_batches=0, epochs=10, target_validation_accuracy=0.5)
+
 """
 @require_built
 
+
+        training_set: Set,
+        validation_set: Set = None,
+        learning_rate: float = .001,
+        n_batches: int = 1,
+        epochs: int = 500,
+        target_train_loss: float = None,
+        target_validation_loss: float = None,
+        target_train_accuracy: float = None,
+        target_validation_accuracy: float = None,
+        
+        
 def fit(
     self,
     training_set: Set,
