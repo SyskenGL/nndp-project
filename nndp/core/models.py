@@ -151,8 +151,6 @@ class MLP:
             training_accuracy = None
             validation_accuracy = None
 
-            # TODO exit
-
             stats.append((
                 epoch,
                 training_loss,
@@ -160,6 +158,9 @@ class MLP:
                 training_accuracy,
                 validation_accuracy
             ))
+
+            # TODO exit
+            # Check all exit conditions
 
         return np.array(stats)
 
@@ -283,6 +284,9 @@ class MLP:
         ))
 
 
+
+
+"""
 from layers import Dense
 from nndp.utils.functions import sse
 
@@ -308,7 +312,7 @@ print(predicted_training)
 
 mlp.fit(Set(np.array([1]), np.array([1])), n_batches=0, epochs=10, target_validation_accuracy=0.5)
 
-"""
+
 @require_built
 
 
