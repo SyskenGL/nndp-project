@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 import numpy as np
+from sklearn import metrics
 
 
-def accuracy(y: np.ndarray, t: np.ndarray):
-    pass
+def accuracy_score(y: np.ndarray, t: np.ndarray):
+    return metrics.accuracy_score(y, t)
 
 
-def precision(y: np.ndarray, t: np.ndarray):
-    pass
+def precision_score(y: np.ndarray, t: np.ndarray):
+    return metrics.precision_score(y, t, average="macro", zero_division=0)
 
 
-def recall(y: np.ndarray, t: np.ndarray):
-    pass
+def recall_score(y: np.ndarray, t: np.ndarray):
+    return metrics.recall_score(y, t, average="macro", zero_division=0)
 
 
 def f1_score(y: np.ndarray, t: np.ndarray):
-    pass
+    return metrics.f1_score(y, t, average="macro", zero_division=0)
