@@ -1,265 +1,596 @@
 #!/usr/bin/env python3
 import numpy as np
-from time import time
+from scipy.special import softmax
+
+from nndp.core.layers import Dense
+from nndp.core.models import MLP
+from nndp.utils.functions import Activation, Loss
+
+np.seterr(over='ignore')
+
+
+# funzioni di attivazione
+def identity(x):
+    return x
+
+
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+
+
+def relu(x):
+    return np.maximum(x, 0)
+
+
+# derivate funzioni di attivazione
+def identity_deriv(x):
+    return np.ones(x.shape)
+
+
+def sigmoid_deriv(x):
+    z = sigmoid(x)
+    return z * (1 - z)
+
+
+def relu_deriv(x):
+    return x > 0
+
+
+# funzioni di errore
+def sum_of_squares(y, t):
+    return 0.5 * np.sum(np.power(y - t, 2))
+
+
+def cross_entropy(y, t, epsilon=1e-15):
+    y = np.clip(y, epsilon, 1. - epsilon)
+    return - np.sum(t * np.log(y))
+
+
+def cross_entropy_softmax(y, t):
+    softmax_y = softmax(y, axis=0)
+    return cross_entropy(softmax_y, t)
+
+
+# derivate funzioni di errore
+def sum_of_squares_deriv(y, t):
+    return y - t
+
+
+# da verificare
+def cross_entropy_deriv(y, t):
+    return - t / y
+
+
+def cross_entropy_softmax_deriv(y, t):
+    softmax_y = softmax(y, axis=0)
+    return softmax_y - t
+
+
+activation_functions = [sigmoid, relu, identity]
+activation_functions_deriv = [sigmoid_deriv, relu_deriv, identity_deriv]
+
+error_functions = [cross_entropy, cross_entropy_softmax, sum_of_squares]
+error_functions_deriv = [cross_entropy_deriv, cross_entropy_softmax_deriv, sum_of_squares_deriv]
+
 import sys
+import os
 
-# ----------------------------------------------------------
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import precision_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import f1_score
 
-def tanh(Z):
-    tanh.derivative = tanh_derivative
-    return np.tanh(Z)
-
-
-def tanh_derivative(Z):
-    return 1.0 - np.tanh(Z) ** 2
-
-
-def leaky_relu(Z):
-    leaky_relu.derivative = leaky_relu_derivative
-    return np.where(Z > 0, Z, Z * 0.01)
+n_activation_functions = 3
+n_error_functions = 3
 
 
-def leaky_relu_derivative(Z):
-    ret = np.ones(Z.shape)
-    ret[Z < 0] = .01
-    return ret
-
-# ----------------------------------------------------------
-
-def relu(Z):
-    relu.derivative = relu_derivative
-    return np.maximum(Z, 0)
+def __types_of_activation_functions():
+    print('\n   Types of activation functions:')
+    print('   1] sigmoid')
+    print('   2] identity')
+    print('   3] ReLU\n')
 
 
-def sigmoid(Z):
-    sigmoid.derivative = sigmoid_derivative
-    return 1 / (1 + np.power(np.e, -Z))
+def __types_of_error_functions():
+    print('\n   Types of error functions:')
+    print('   1] Cross Entropy')
+    print('   2] Cross Entropy Soft Max')
+    print('   3] Sum of Squares\n')
 
 
-def relu_derivative(Z):
-    dZ = np.zeros(Z.shape)
-    dZ[Z > 0] = 1
-    return dZ
+def __check_int_input(value, min_value, max_value):
+    if not value.isnumeric() or (not int(value) >= min_value or not int(value) <= max_value):
+        raise ValueError
 
 
-def sigmoid_derivative(Z):
-    f = 1 / (1 + np.exp(-Z))
-    return f * (1 - f)
-
-
-def softMaxCe(x):
-    softMaxCe.derivative = derivSoftMaxCe
-    e = np.exp(x - np.max(x))
-    return e / np.sum(e)
-
-
-def derivSoftMaxCe(x):
-    return 1
-
-# ----------------------------------------------------------
-
-def crossEntropy(y, t):
-    crossEntropy.derivative = derivCrossEntropy
-    return np.sum(y * np.log(t))
-
-
-def crossEntropySM(y, t):
-    crossEntropySM.derivative = derivCrossEntropySM
-    a = np.log(y + 1e-10)  # evitiamo che ci siano zeri
-    return np.sum(t * a)
-
-
-def sumOfSquare(y, t):
-    sumOfSquare.derivative = derivSumOfSquare
-    return np.sum(np.square(y - t))
-
-
-def derivCrossEntropySM(y, t):
-    return y - t
-
-
-def derivCrossEntropy(y, t):
-    return -y / t + (1 - t) / (1 - y)
-
-
-def derivSumOfSquare(y, t):
-    return y - t
-
-# ----------------------------------------------------------
-
-class FullyConnectedLayer:
-    def __init__(self, input_neuroids, n_neuroids, activation):
-        self.tag = "hidden"
-        self.shape = n_neuroids  # numero neuroni del layer
-        self.weights = .1 * np.random.randn(n_neuroids, input_neuroids)  # init pesi
-        self.bias = .1 * np.random.randn()  # init bias
-        self.actifun = activation  # funzione di attivazione
-
-        # caches [salva i dati per backpropagation e update]
-        self._layer_in = None
-        self._weighted_in = None
-        self._delta = None
-        self._cumuled_delta = np.zeros((n_neuroids, input_neuroids))
-        self._cumuled_bias_delta = 0
-
-    def forw_prop(self, layer_in):
-        self._layer_in = layer_in
-        self._weighted_in = self.weights @ layer_in + self.bias  # prodotto matrice-vettore
-        return self.actifun(self._weighted_in)
-
-    def back_prop(self, delta):  # ricevo dal layer successivo il delta. Lo moltiplico per la derivata della funz
-        # di attivazione
-        self._delta = delta * self.actifun.derivative(self._weighted_in)  # gradiente = [ Error'(z) * actifun'(z) ]
-        return self.weights.T @ self._delta  # ritorno la trasposta dei pesi per il delta
-
-    def update(self, eta=.1, mustUpdate=True, batch_size=1):
-
-        self._cumuled_delta += self._delta @ self._layer_in.T  # accumula
-        self._cumuled_bias_delta += np.sum(self._delta)
-
-        if mustUpdate or batch_size == 1:  # se è online oppure fine del batch
-            self._cumuled_delta /= batch_size  # dividi per batch_size
-            self._cumuled_bias_delta /= batch_size
-            self.weights -= eta * self._cumuled_delta  # aggiorna
-            self.bias -= eta * self._cumuled_bias_delta
-            self._cumuled_delta = np.zeros(self._cumuled_delta.shape)  # resetta accumulatori
-            self._cumuled_bias_delta = 0
-
-    def reset(self):
-        self.weights = .1 * np.random.randn(self.weights.shape[0], self.weights.shape[1])
-
-# ----------------------------------------------------------
-
-class NeuralNetwork:
-
-    def __init__(self, eta=.1, target_loss=None, target_epochs=None, target_acc=None, mode='on-line', batch_size=1,
-                 loss_fun='sum-of-square'):
-        self.layers = []
-        self.eta = eta  # learning rate  0 < eta <= 1
-        assert (target_loss is not None or target_epochs is not None or target_acc is not None)
-        # almeno una condizione di stop ci deve essere
-        self.target_epochs = target_epochs
-        self.target_loss = target_loss
-        self.target_acc = target_acc
-        self.mode = mode  # [full-batch/mini-batch/on-line]
-        self.loss_metric = loss_fun
-        self.learn_curve = []
-        self.curr_loss = None
-
-        if mode == 'on-line':
-            self.batch_size = 1
-        else:
-            self.batch_size = batch_size
-
-        if loss_fun == 'sum-of-square':
-            self.loss_fun = sumOfSquare
-        else:
-            self.loss_fun = crossEntropySM
-
-    def add_layer(self, layer):
-        self.layers.append(layer)
-
-    def add_all(self, layers):
-        for layer in layers:
-            self.add_layer(layer)
-
-    def fit(self, X, y, valid_X=None, valid_y=None):
-        n_sample = X.shape[0]
-
-        if self.mode == 'full-batch':
-            self.batch_size = n_sample
-
-        target = self._one_hot(y)
-
-        epoch = 0
-        train_acc = 0
-        valid_acc = 0
-        err = 1
-        start = time()
-        ret = []
+def __get_int_input(string, min_value=0, max_value=sys.maxsize):
+    flag = False
+    value = None
+    while not flag:
         try:
-            while (self.target_epochs is None or self.target_epochs > epoch) and \
-                    (self.target_loss is None or err > self.target_loss) and \
-                    (self.target_acc is None or train_acc < self.target_acc):  # fino alla condizione di stop
-                epoch += 1
-                err = 0
-                for i in range(n_sample):  # per ogni dato nel t.s.
-                    # bisogna aggiornare i pesi se ci troviamo alla fine del batch
-                    to_update = (i % self.batch_size + 1 == self.batch_size)
-                    self._back_prop(X[i, :], target[i, :], self.batch_size, to_update)
+            value = input(string)
+            __check_int_input(value, min_value, max_value)
+            flag = True
+        except ValueError:
+            print('invalid input!\n')
 
-                    err += np.sum(np.abs(self.curr_loss))
-                    sys.stdout.write(f"epoch {epoch} processing sample {i + 1}/{n_sample} curr loss:{err / (i + 1)}\r")
-                    sys.stdout.flush()
-
-                err /= n_sample
-                print()
-                sys.stdout.write(f"calculating training accuracy...\r")
-                sys.stdout.flush()
-
-                train_acc = (n_sample - np.count_nonzero(self.predict(X) - y)) / n_sample  # accuracy
-                print(f"epoch {epoch} training accuracy: {train_acc}")
-                if valid_X is not None:
-                    sys.stdout.write(f"calculating validation accuracy...\r")
-                    sys.stdout.flush()
-                    valid_acc = (valid_X.shape[0] - np.count_nonzero(self.predict(valid_X) - valid_y)) / valid_X.shape[
-                        0]
-                    print(f"epoch {epoch} validation accuracy: {valid_acc}")
-
-                ret.append([epoch, err, train_acc, valid_acc])  # dati sul training
-        except KeyboardInterrupt:
-            print("\ntraining stopped by user\n")
-
-        print(f"elapsed time: {time() - start} s")
-        return np.array(ret)
-
-    def predict(self, x):
-        ret = []
-        for i in range(x.shape[0]):
-            ret.append(self._forw_prop(x[i, :]))
-        return np.array(ret)
-
-    def _forw_prop(self, x):  # propago x per ogni layer
-        for layer in self.layers:
-            x = layer.forw_prop(x)
-        return x.T
-
-    def _back_prop(self, x, t):  # se necessario, upgrado i pesi. Per aggiornarli mi serve
-        curr = x  # batch_size.
-        for layer in self.layers:  # propaga avanti
-            curr = layer.forw_prop(curr)
-
-        self.curr_loss = self.loss_fun(curr, t)  # calcolo perdita
-        curr = self.loss_fun.derivative(curr, t)  # calcolo gradiente
-
-        if self.loss_metric == 'cross-entropy':  # normalizza perdita
-            self.curr_loss /= np.log(t.shape[0])
-
-        for layer in reversed(self.layers):  # calcola i delta
-            curr = layer.back_prop(curr)
+    return int(value)
 
 
-    def _one_hot(self, y):  # 1 in corrispondenza della 'parola', 0 altrimenti
-        n_class = np.max(y) + 1
-        oh = np.zeros((y.shape[0], n_class))
-        for i in range(y.shape[0]):
-            oh[i, y[i]] = 1
-        return oh
-
-    def print(self):
-        for i in range(len(self.layers)):
-            print(f" {i}) {self.layers[i].tag} layer shape {self.layers[i].shape}")
-
-    def reset(self):
-        for layer in self.layers:
-            layer.reset()
+def is_standard_conf():
+    choice = __get_int_input('Do you want to use the default configuration? (Y=1 / N=0): ', 0, 1)
+    os.system('clear')
+    return choice
 
 
-nn = NeuralNetwork(target_epochs=500)
-nn.add_all([
-    FullyConnectedLayer(3, 2, sigmoid),
-    FullyConnectedLayer(2, 3, sigmoid),
-    FullyConnectedLayer(3, 5, sigmoid)
-])
+def get_nn_type():
+    text = ("\nSelect a neural network type: \n"
+            "1] Multilayer Neural Network \n"
+            "2] Convolutional Neural Network \n\n? ")
+    nn_type = __get_int_input(text, min_value=1, max_value=2)
 
-print(nn.predict(np.array([[1, 2, 3], [1, 1, 1], [1, 4, 3]])))
+    if nn_type != 1 and nn_type != 2:
+        raise ValueError('Invalid choice')
+
+    os.system('clear')
+    return 'fc_nn' if nn_type == 1 else 'cv_nn'
+
+
+def get_conf_ml_net():
+    _, columns = os.popen('stty size', 'r').read().split()
+    columns = int(columns)
+
+    title = 'NEURAL NETWORK PROJECT'
+    sub_title = 'creation of a multilayer neural network'
+
+    title_space = int((columns - (len(title) + 2)) / 2)
+    sub_title_space = int((columns - len(sub_title)) / 2)
+
+    print('\n\n')
+    print('-' * title_space, title, '-' * title_space, ' ' * sub_title_space, sub_title, '\n')
+
+    n_hidden_layers = __get_int_input('define the number of hidden layers (min value = 1): ', min_value=1)
+
+    n_hidden_nodes_per_layer = list()
+    act_fun_codes = list()
+
+    __types_of_activation_functions()
+
+    for i in range(n_hidden_layers):
+        print('hidden layer', i + 1)
+
+        n_nodes = __get_int_input('-  number of nodes: ', 1)
+        n_hidden_nodes_per_layer.append(int(n_nodes))
+
+        act_fun_code = 0
+        act_fun_codes.append(act_fun_code)
+
+        print('\n')
+
+    print('output layer :')
+    act_fun_code = 0
+    act_fun_codes.append(act_fun_code)
+
+    __types_of_error_functions()
+    error_fun_code = 0
+
+    os.system('clear')
+
+    return n_hidden_layers, n_hidden_nodes_per_layer, act_fun_codes, error_fun_code
+
+
+def get_conf_cv_net():
+    _, columns = os.popen('stty size', 'r').read().split()
+    columns = int(columns)
+
+    title = 'NEURAL NETWORK PROJECT'
+    sub_title = 'creation of a convolutional neural network'
+
+    title_space = int((columns - (len(title) + 2)) / 2)
+    sub_title_space = int((columns - len(sub_title)) / 2)
+
+    print('\n\n')
+    print('-' * title_space, title, '-' * title_space, ' ' * sub_title_space, sub_title, '\n')
+
+    n_cv_layers = __get_int_input('define the number of convolutional layers (min value = 1): ', min_value=1)
+
+    n_kernels_per_layer = list()
+    act_fun_codes = list()
+
+    print('\n')
+    for i in range(n_cv_layers):
+        print('convlutional layer', i + 1)
+
+        n_kernels = __get_int_input('-  number of kernels: ', 1)
+        n_kernels_per_layer.append(int(n_kernels))
+
+    __types_of_activation_functions()
+
+    print('hidden layer :')
+    act_fun_code = __get_int_input('-  activaction function: ', 1, n_activation_functions) - 1
+    act_fun_codes.append(act_fun_code)
+
+    n_hidden_nodes = __get_int_input('-  number of nodes: ', 1)
+
+    print('\noutput layer :')
+    act_fun_code = __get_int_input('-  activaction function: ', 1, n_activation_functions) - 1
+    act_fun_codes.append(act_fun_code)
+
+    __types_of_error_functions()
+    error_fun_code = __get_int_input('-  define the error function: ', 1, n_error_functions) - 1
+
+    os.system('clear')
+
+    return n_cv_layers, n_kernels_per_layer, n_hidden_nodes, act_fun_codes, error_fun_code
+
+
+def get_mnist_data(data):
+    data = np.array(data)
+    data = np.transpose(data)
+    return data
+
+
+def get_mnist_labels(labels):
+    labels = np.array(labels)
+    one_hot_labels = np.zeros((10, labels.shape[0]), dtype=int)
+
+    for n in range(labels.shape[0]):
+        label = labels[n]
+        one_hot_labels[label][n] = 1
+
+    return one_hot_labels
+
+
+def get_random_dataset(X, t, n_samples=10000):
+    if X.shape[1] < n_samples:
+        raise ValueError
+
+    n_tot_samples = X.shape[1]
+    n_samples_not_considered = n_tot_samples - n_samples
+
+    new_dataset = np.array([1] * n_samples + [0] * n_samples_not_considered)
+    np.random.shuffle(new_dataset)
+
+    index = np.where(new_dataset == 1)
+    index = np.reshape(index, -1)
+
+    new_X = X[:, index]
+    new_t = t[:, index]
+
+    return new_X, new_t
+
+
+def get_scaled_data(X):
+    X = X.astype('float32')
+    X = X / 255.0
+    return X
+
+
+def train_test_split(X, t, test_size=0.25):
+    n_samples = X.shape[1]
+    test_size = int(n_samples * test_size)
+    train_size = n_samples - test_size
+
+    dataset = np.array([1] * train_size + [0] * test_size)
+    np.random.shuffle(dataset)
+
+    train_index = np.where(dataset == 1)
+    train_index = np.reshape(train_index, -1)
+
+    X_train = X[:, train_index]
+    t_train = t[:, train_index]
+
+    test_index = np.where(dataset == 0)
+    test_index = np.reshape(test_index, -1)
+
+    X_test = X[:, test_index]
+    t_test = t[:, test_index]
+
+    return X_train, X_test, t_train, t_test
+
+
+def convert_to_cnn_input(X, image_size):
+    n_instances = X.shape[1]
+    new_X = np.empty(shape=(n_instances, image_size, image_size))
+
+    for i in range(n_instances):
+        new_X[i] = X[:, i].reshape(image_size, image_size)
+
+    return new_X
+
+
+def get_metric_value(y, t, metric):
+    print(t.shape)
+    print(y.shape)
+    pred = np.argmax(y, axis=0)
+    target = np.argmax(t, axis=0)
+
+    pred = pred.tolist()
+    target = target.tolist()
+
+    if metric == 'accuracy':
+        return accuracy_score(pred, target)
+    elif metric == 'precision':
+        return precision_score(pred, target, average='macro', zero_division=0)
+    elif metric == 'recall':
+        return recall_score(pred, target, average='macro', zero_division=0)
+    elif metric == 'f1':
+        return f1_score(pred, target, average='macro', zero_division=0)
+
+    raise ValueError()
+
+
+def print_result(y_test, t_test):
+    accuracy = get_metric_value(y_test, t_test, 'accuracy')
+    precision = get_metric_value(y_test, t_test, 'precision')
+    recall = get_metric_value(y_test, t_test, 'recall')
+    f1 = get_metric_value(y_test, t_test, 'f1')
+
+    print('\n')
+    print('-' * 63)
+    print('Performance on test set\n')
+    print(y_test)
+    print('     accuracy: {:.2f} - precision: {:.2f} - recall: {:.2f} - f1: {:.2f}\n\n'.format(accuracy, precision,
+                                                                                               recall, f1))
+
+
+import numpy as np
+
+from copy import deepcopy
+
+
+def __get_delta(net, t, layers_input, layers_output):
+    delta = list()
+    for i in range(net.n_layers):
+        delta.append(np.zeros(net.nodes_per_layer[i]))
+
+    for i in range(net.n_layers - 1, -1, -1):
+        act_fun_deriv = activation_functions_deriv[net.act_fun_code_per_layer[i]]
+
+        if i == net.n_layers - 1:
+            # calcolo delta nodi di output
+            error_fun_deriv = error_functions_deriv[net.error_fun_code]
+            delta[i] = act_fun_deriv(layers_input[i]) * error_fun_deriv(layers_output[i], t)
+
+        else:
+            # calcolo delta nodi interni
+            delta[i] = act_fun_deriv(layers_input[i]) * np.dot(np.transpose(net.weights[i + 1]), delta[i + 1])
+
+    return delta
+
+
+def __get_weights_bias_deriv(net, x, delta, layers_output):
+    weights_deriv = []
+    bias_deriv = []
+
+    for i in range(net.n_layers):
+        if i == 0:
+            weights_deriv.append(np.dot(delta[i], np.transpose(x)))
+        else:
+            weights_deriv.append(np.dot(delta[i], np.transpose(layers_output[i - 1])))
+        bias_deriv.append(delta[i])
+
+    return weights_deriv, bias_deriv
+
+
+def __standard_gradient_descent(net, weights_deriv, bias_deriv, eta):
+    for i in range(net.n_layers):
+        net.weights[i] = net.weights[i] - (eta * weights_deriv[i])
+        net.bias[i] = net.bias[i] - (eta * bias_deriv[i])
+    return net
+
+
+def batch_learning(net, X_train, t_train, X_val, t_val, eta=0.001, n_epochs=500):
+    train_errors, val_errors = list(), list()
+
+    error_fun = error_functions[net.error_fun_code]
+
+    best_net, min_error = None, None
+    tot_weights_deriv, tot_bias_deriv = None, None
+
+    n_instances = X_train.shape[1]
+
+    for epoch in range(n_epochs):
+        # somma delle derivate
+        print('Epoch {} / {}'.format(epoch + 1, n_epochs))
+        for n in range(n_instances):
+            # si estrapolano singole istanze come vettori colonna
+            x = X_train[:, n].reshape(-1, 1)
+            t = t_train[:, n].reshape(-1, 1)
+            weights_deriv, bias_deriv = __back_propagation(net, x, t)
+
+            if n == 0:
+                tot_weights_deriv = deepcopy(weights_deriv)
+                tot_bias_deriv = deepcopy(bias_deriv)
+            else:
+                for i in range(net.n_layers):
+                    tot_weights_deriv[i] = np.add(tot_weights_deriv[i], weights_deriv[i])
+                    tot_bias_deriv[i] = np.add(tot_bias_deriv[i], bias_deriv[i])
+
+        net = __standard_gradient_descent(net, tot_weights_deriv, tot_bias_deriv, eta)
+
+        y_train = net.sim(X_train)
+        y_val = net.sim(X_val)
+
+        train_error = error_fun(y_train, t_train)
+        val_error = error_fun(y_val, t_val)
+
+        train_errors.append(train_error)
+        val_errors.append(val_error)
+
+        train_accuracy = get_metric_value(y_train, t_train, 'accuracy')
+        val_accuracy = get_metric_value(y_val, t_val, 'accuracy')
+
+        print('     train loss: {:.2f} - val loss: {:.2f}'.format(train_error, val_error))
+        print('     train accuracy: {:.2f} - val accuracy: {:.2f}\n'.format(train_accuracy, val_accuracy))
+
+        if best_net is None or val_error < min_error:
+            min_error = val_error
+            best_net = deepcopy(net)
+
+    return best_net
+
+
+def __back_propagation(net, x, t):
+    # x: singola istanza
+    layers_input, layers_output = net.forward_step(x)
+    delta = __get_delta(net, t, layers_input, layers_output)
+    weights_deriv, bias_deriv = __get_weights_bias_deriv(net, x, delta, layers_output)
+
+    return weights_deriv, bias_deriv
+
+
+import os
+
+
+class MultilayerNet:
+    def __init__(self, n_hidden_layers, n_hidden_nodes_per_layer, act_fun_codes, error_fun_code):
+        self.n_input_nodes = 784  # dipende dal dataset: mnist_in = 784
+        self.n_output_nodes = 10  #  dipende dal dataset: mnist_out = 10
+        self.n_layers = n_hidden_layers + 1
+
+        self.error_fun_code = error_fun_code
+        self.act_fun_code_per_layer = act_fun_codes.copy()
+
+        self.nodes_per_layer = n_hidden_nodes_per_layer.copy()
+        self.nodes_per_layer.append(self.n_output_nodes)
+
+        self.weights = list()
+        self.bias = list()
+
+        self.__initialize_weights_and_bias()
+
+    def __initialize_weights_and_bias(self):
+        mu, sigma = 0, 0.1
+
+        for i in range(self.n_layers):
+            if i == 0:
+                self.weights.append(np.random.normal(mu, sigma, size=(self.nodes_per_layer[i], self.n_input_nodes)))
+            else:
+                self.weights.append(
+                    np.random.normal(mu, sigma, size=(self.nodes_per_layer[i], self.nodes_per_layer[i - 1])))
+
+            self.bias.append(np.random.normal(mu, sigma, size=(self.nodes_per_layer[i], 1)))
+
+    def forward_step(self, x):
+        layers_input = list()
+        layers_output = list()
+
+        for i in range(self.n_layers):
+            if i == 0:
+                input = np.dot(self.weights[i], x) + self.bias[i]
+                layers_input.append(input)
+
+            else:
+                input = np.dot(self.weights[i], layers_output[i - 1]) + self.bias[i]
+                layers_input.append(input)
+
+            act_fun = activation_functions[self.act_fun_code_per_layer[i]]
+            output = act_fun(input)
+            layers_output.append(output)
+
+        return layers_input, layers_output
+
+    def sim(self, x):
+        for i in range(self.n_layers):
+            if i == 0:
+                input = np.dot(self.weights[i], x) + self.bias[i]
+            else:
+                input = np.dot(self.weights[i], output) + self.bias[i]
+
+            act_fun = activation_functions[self.act_fun_code_per_layer[i]]
+            output = act_fun(input)
+
+        return output
+
+    def print_config(self):
+
+        print("• input layer: {:>11} nodes".format(self.n_input_nodes))
+
+        error_fun = error_functions[self.error_fun_code]
+        error_fun = error_fun.__name__
+
+        for i in range(self.n_layers):
+            act_fun = activation_functions[self.act_fun_code_per_layer[i]]
+            act_fun = act_fun.__name__
+
+            if i != self.n_layers - 1:
+                print("• hidden layer {}: {:>8} nodes, ".format(i + 1, self.nodes_per_layer[i]),
+                      "{:^10} \t (activation function)".format(act_fun))
+
+            else:
+                print("• output layer: {:>10} nodes, ".format(self.n_output_nodes),
+                      "{:^10} \t (activation function)".format(act_fun))
+
+        print("\n {} (error function)".format(error_fun))
+
+        print('\n')
+
+
+from mnist import MNIST
+from nndp.utils.collections import Set
+
+
+def run():
+
+
+    mndata = MNIST('../data/mnist')
+    X, t = mndata.load_training()
+    X = get_mnist_data(X)
+    t = get_mnist_labels(t)
+    X, t = get_random_dataset(X, t, n_samples=1000)
+    X = get_scaled_data(X)
+
+    X_train, X_test, t_train, t_test = train_test_split(X, t, test_size=0.25)
+    X_train, X_val, t_train, t_val = train_test_split(X_train, t_train, test_size=0.25)
+
+    X_train, X_val, t_train, t_val = X_train.T, X_val.T, t_train.T, t_val.T
+
+
+    nn = MLP(
+        [
+            Dense(10, Activation.SIGMOID),
+            Dense(10, Activation.SIGMOID),
+            Dense(10, Activation.IDENTITY)
+        ],
+        Loss.SSE
+    )
+
+    nn.build(784)
+
+    t_train = np.reshape(t_train, (*t_train.shape, 1))
+    t_val = np.reshape(t_val, (*t_val.shape, 1))
+    print(X_train.shape)
+    print(t_train.shape)
+
+    nn.fit(Set(X_train, t_train), Set(X_val, t_val), learning_rate=0.005, n_batches=0, epochs=30000, target_validation_accuracy=0.9)
+
+def run1():
+    # parametri di default
+    n_hidden_layers = 2
+    n_hidden_nodes_per_layer = [10, 10]
+    act_fun_codes = [1, 1, 2]
+    error_fun_code = 1
+
+    # caricamento dataset
+    mndata = MNIST('../data/mnist')
+    X, t = mndata.load_training()
+    X = get_mnist_data(X)
+    t = get_mnist_labels(t)
+
+    X, t = get_random_dataset(X, t, n_samples=1000)
+    X = get_scaled_data(X)
+
+    X_train, X_test, t_train, t_test = train_test_split(X, t, test_size=0.25)
+    X_train, X_val, t_train, t_val = train_test_split(X_train, t_train, test_size=0.25)
+
+    net = MultilayerNet(n_hidden_layers=n_hidden_layers, n_hidden_nodes_per_layer=n_hidden_nodes_per_layer,
+                        act_fun_codes=act_fun_codes, error_fun_code=error_fun_code)
+
+    net.print_config()
+
+    net = batch_learning(net, X_train, t_train, X_val, t_val)
+    y_test = net.sim(X_test)
+    print_result(y_test, t_test)
+
+run()
