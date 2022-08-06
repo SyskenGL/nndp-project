@@ -154,14 +154,6 @@ class MLP:
                 validation_accuracy
             ))
 
-            print({
-                "epoch": epoch,
-                "training_loss": training_loss,
-                "validation_loss": validation_loss,
-                "training_accuracy": round(training_accuracy, 2),
-                "validation_accuracy": round(validation_accuracy, 2)
-            })
-
             if (
                 (target_training_accuracy and target_training_accuracy <= training_accuracy) or
                 (target_validation_accuracy and target_validation_accuracy <= validation_accuracy)
