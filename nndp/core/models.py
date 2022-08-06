@@ -9,7 +9,7 @@ from nndp.utils.collections import Set
 from nndp.utils.functions import Loss
 from nndp.utils.decorators import require_built
 from nndp.utils.decorators import require_not_built
-from nndp.utils.metrics import accuracy_score
+from nndp.utils.metrics import accuracy_score, f1_score
 
 
 class MLP:
@@ -88,15 +88,16 @@ class MLP:
         learning_rate: float = .001,
         n_batches: int = 1,
         epochs: int = 500,
-        target_training_accuracy: float = None,
-        target_validation_accuracy: float = None
+        target_loss: float = None,
+        target_accuracy: float = None,
+        target_f1: float = None
     ) -> np.ndarray:
 
         if training_set.size == 0:
             raise ValueError("provided an empty training set.")
         if validation_set and validation_set.size == 0:
             raise ValueError("provided an empty validation set.")
-        if not validation_set and target_validation_accuracy:
+        if not validation_set and (target_loss or target_accuracy or target_f1):
             raise ValueError(f"expected a validation set.")
 
         if not 0 < learning_rate <= 1:
@@ -106,10 +107,10 @@ class MLP:
         if epochs <= 0:
             raise ValueError(f"epochs must be greater than 0.")
 
-        if target_training_accuracy and not 0 < target_training_accuracy < 1:
-            raise ValueError("target_training_accuracy must be in (0, 1).")
-        if target_validation_accuracy and not 0 < target_validation_accuracy < 1:
-            raise ValueError("target_validation_accuracy must be in (0, 1).")
+        if target_accuracy and not 0 < target_accuracy < 1:
+            raise ValueError("target_accuracy must be in (0, 1).")
+        if target_f1 and not 0 < target_f1 < 1:
+            raise ValueError("target_f1 must be in (0, 1).")
 
         stats = []
         batches = [
@@ -146,17 +147,20 @@ class MLP:
             training_accuracy = accuracy_score(training_predictions, training_set.labels)
             validation_accuracy = accuracy_score(validation_predictions, validation_set.labels)
 
+            training_f1 = f1_score(training_predictions, training_set.labels)
+            validation_f1 = f1_score(validation_predictions, validation_set.labels)
+
             stats.append((
                 epoch,
-                training_loss,
-                validation_loss,
-                training_accuracy,
-                validation_accuracy
+                training_loss, validation_loss,
+                training_accuracy, validation_accuracy,
+                training_f1, validation_f1
             ))
 
             if (
-                (target_training_accuracy and target_training_accuracy <= training_accuracy) or
-                (target_validation_accuracy and target_validation_accuracy <= validation_accuracy)
+                (target_loss and target_loss >= validation_loss) or
+                (target_accuracy and target_accuracy <= validation_accuracy) or
+                (target_f1 and target_f1 <= validation_f1)
             ):
                 break
 
