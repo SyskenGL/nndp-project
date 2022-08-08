@@ -173,7 +173,7 @@ class MLP:
             ))
 
             self._logger.info(
-                f"\n\n\033[1m Epoch \033[0m{epoch + 1}/{epochs}\n\n"
+                f"\033[1m Epoch \033[0m{epoch + 1}/{epochs}\n\n"
                 f"\033[1m   • Training loss:\033[0m {training_loss:.3f}\n"
                 f"\033[1m   • Training accuracy:\033[0m {training_accuracy:.3f}\n"
                 f"\033[1m   • Training F1:\033[0m {training_f1:.3f}\n\n"
@@ -182,13 +182,13 @@ class MLP:
                 f"\033[1m   • Validation accuracy:\033[0m "
                 f"{format(validation_accuracy, '.3f') if validation_accuracy else '-'}\n"
                 f"\033[1m   • Validation F1:\033[0m "
-                f"{format(validation_loss, '.3f') if validation_loss else '-'}\n\n"
+                f"{format(validation_f1, '.3f') if validation_f1 else '-'}\n\n"
                 f"\033[1m   • Target loss:\033[0m "
                 f"{format(target_loss, '.3f') if target_loss else '-'}\n"
                 f"\033[1m   • Target accuracy:\033[0m "
                 f"{format(target_accuracy, '.3f') if target_accuracy else '-'}\n"
                 f"\033[1m   • Target F1:\033[0m "
-                f"{format(target_f1, '.3f') if target_f1 else '-'}\n"
+                f"{format(target_f1, '.3f') if target_f1 else '-'}"
             )
 
             if (
