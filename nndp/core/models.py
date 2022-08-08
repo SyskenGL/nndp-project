@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 import uuid
+import logging
 import numpy as np
 from tabulate import tabulate
 from nndp.core.layers import Layer
@@ -26,6 +27,7 @@ class MLP:
         )
         self._layers = layers if layers else []
         self._loss = loss
+        self._logger = logging.getLogger(self._name)
 
     def is_built(self) -> bool:
         return (
@@ -89,15 +91,16 @@ class MLP:
         n_batches: int = 1,
         epochs: int = 500,
         target_loss: float = None,
-        target_accuracy_score: float = None,
-        target_f1_score: float = None
+        target_accuracy: float = None,
+        target_f1: float = None,
+        weak_target: bool = True
     ) -> np.ndarray:
 
         if training_set.size == 0:
             raise ValueError("provided an empty training set.")
         if validation_set and validation_set.size == 0:
             raise ValueError("provided an empty validation set.")
-        if not validation_set and (target_loss or target_accuracy_score or target_f1_score):
+        if not validation_set and (target_loss or target_accuracy or target_f1):
             raise ValueError(f"expected a validation set.")
 
         if not 0 < learning_rate <= 1:
@@ -107,10 +110,10 @@ class MLP:
         if epochs <= 0:
             raise ValueError(f"epochs must be greater than 0.")
 
-        if target_accuracy_score and not 0 < target_accuracy_score < 1:
-            raise ValueError("target_accuracy_score must be in (0, 1).")
-        if target_f1_score and not 0 < target_f1_score < 1:
-            raise ValueError("target_f1_score must be in (0, 1).")
+        if target_accuracy and not 0 < target_accuracy < 1:
+            raise ValueError("target_accuracy must be in (0, 1).")
+        if target_f1 and not 0 < target_f1 < 1:
+            raise ValueError("target_f1 must be in (0, 1).")
 
         stats = []
         batches = [
@@ -148,34 +151,57 @@ class MLP:
                 validation_predictions, validation_set.labels
             ) if validation_set else None
 
-            training_accuracy_score = accuracy_score(
+            training_accuracy = accuracy_score(
                 training_predictions, training_set.labels
             )
-            validation_accuracy_score = accuracy_score(
+            validation_accuracy = accuracy_score(
                 validation_predictions, validation_set.labels
-            )
+            ) if validation_set else None
 
-            training_f1_score = f1_score(
+            training_f1 = f1_score(
                 training_predictions, training_set.labels
             )
-            validation_f1_score = f1_score(
+            validation_f1 = f1_score(
                 validation_predictions, validation_set.labels
-            )
+            ) if validation_set else None
 
             stats.append((
                 epoch,
                 training_loss, validation_loss,
-                training_accuracy_score, validation_accuracy_score,
-                training_f1_score, validation_f1_score
+                training_accuracy, validation_accuracy,
+                training_f1, validation_f1
             ))
 
+            self._logger.info(
+                f"\n\n\033[1m Epoch \033[0m{epoch + 1}/{epochs}\n\n"
+                f"\033[1m   • Training loss:\033[0m {training_loss:.3f}\n"
+                f"\033[1m   • Training accuracy:\033[0m {training_accuracy:.3f}\n"
+                f"\033[1m   • Training F1:\033[0m {training_f1:.3f}\n\n"
+                f"\033[1m   • Validation loss:\033[0m "
+                f"{format(validation_loss, '.3f') if validation_loss else '-'}\n"
+                f"\033[1m   • Validation accuracy:\033[0m "
+                f"{format(validation_accuracy, '.3f') if validation_accuracy else '-'}\n"
+                f"\033[1m   • Validation F1:\033[0m "
+                f"{format(validation_loss, '.3f') if validation_loss else '-'}\n\n"
+                f"\033[1m   • Target loss:\033[0m "
+                f"{format(target_loss, '.3f') if target_loss else '-'}\n"
+                f"\033[1m   • Target accuracy:\033[0m "
+                f"{format(target_accuracy, '.3f') if target_accuracy else '-'}\n"
+                f"\033[1m   • Target F1:\033[0m "
+                f"{format(target_f1, '.3f') if target_f1 else '-'}\n"
+            )
+
             if (
-                (target_loss and target_loss >= validation_loss) or
-                (
-                    target_accuracy_score and
-                    target_accuracy_score <= validation_accuracy_score
-                ) or
-                (target_f1_score and target_f1_score <= validation_f1_score)
+                (weak_target and (
+                    (target_loss and target_loss >= validation_loss) or
+                    (target_accuracy and target_accuracy <= validation_accuracy) or
+                    (target_f1 and target_f1 <= validation_f1)
+                )) or
+                (not weak_target and (
+                    (target_loss and target_loss >= validation_loss) and
+                    (target_accuracy and target_accuracy <= validation_accuracy) and
+                    (target_f1 and target_f1 <= validation_f1)
+                ))
             ):
                 break
 
@@ -267,7 +293,7 @@ class MLP:
                 ],
                 ["\033[1m LOSS \033[0m", self._loss.function().__name__],
                 [
-                    "\033[1m # TRAINABLE \033[0m",
+                    "\033[1m TRAINABLE \033[0m",
                     self.n_trainable if self.is_built() else "-"
                 ],
                 ["\033[1m BUILT\033[0m", self.is_built()]
@@ -277,12 +303,12 @@ class MLP:
         ))
         layers = "\n".join([str(layer) for layer in self._layers])
         structure = str(tabulate([[
-                self._layers[h].name if h != -1 else "-",
-                ("HIDDEN" if h != self.depth - 1 else "OUTPUT")
-                if h != -1 else "INPUT",
-                self._layers[h].width if h != -1
-                else (self.in_size if self.in_size else "-"),
-            ] for h in range(-1, self.depth)],
+            self._layers[h].name if h != -1 else "-",
+            ("HIDDEN" if h != self.depth - 1 else "OUTPUT")
+            if h != -1 else "INPUT",
+            self._layers[h].width if h != -1
+            else (self.in_size if self.in_size else "-"),
+        ] for h in range(-1, self.depth)],
             tablefmt="fancy_grid",
             colalign=["center"] * 3
         )) if len(self._layers) != 0 else ""

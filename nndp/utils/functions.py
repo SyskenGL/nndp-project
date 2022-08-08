@@ -36,12 +36,17 @@ def tanh_prime(x: np.ndarray) -> np.ndarray:
     return 1 - tanh(x)**2
 
 
-def softmax(x: np.ndarray) -> np.ndarray:
-    return np.exp(x - np.max(x)) / np.sum(np.exp(x - np.max(x)))
+def softmax(x: np.ndarray, axis: int = None) -> np.ndarray:
+    return np.exp(
+        x - np.max(x, axis=axis, keepdims=True)
+    ) / np.sum(
+        np.exp(x - np.max(x, axis=axis, keepdims=True)),
+        axis=axis, keepdims=True
+    )
 
 
 def sse(y: np.ndarray, t: np.ndarray) -> np.ndarray:
-    return 0.5 * np.sum(np.power(y - t, 2))
+    return 0.5 * np.sum(np.square(y - t))
 
 
 def sse_prime(y: np.ndarray, t: np.ndarray) -> np.ndarray:
@@ -58,11 +63,13 @@ def cross_entropy_prime(y: np.ndarray, t: np.ndarray) -> np.ndarray:
 
 
 def softmax_cross_entropy(y: np.ndarray, t: np.ndarray) -> np.ndarray:
-    return cross_entropy(softmax(y), t)
+    axis = 0 if y.ndim <= 2 else 1
+    return cross_entropy(softmax(y, axis), t)
 
 
 def softmax_cross_entropy_prime(y: np.ndarray, t: np.ndarray) -> np.ndarray:
-    return softmax(y) - t
+    axis = 0 if y.ndim <= 2 else 1
+    return softmax(y, axis) - t
 
 
 class Activation(Enum):

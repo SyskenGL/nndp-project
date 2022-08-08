@@ -117,7 +117,7 @@ class Layer:
                 "\033[1m IN_SIZE \033[0m",
                 "\033[1m WIDTH \033[0m",
                 "\033[1m ACTIVATION \033[0m",
-                "\033[1m # TRAINABLE \033[0m",
+                "\033[1m TRAINABLE \033[0m",
                 "\033[1m BUILT \033[0m"
             ],
             tablefmt="fancy_grid",
