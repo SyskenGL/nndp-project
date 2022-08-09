@@ -60,7 +60,7 @@ class MLP:
                 f"expected a list of biases of "
                 f"length {len(self._layers)}, received {len(biases)}."
             )
-        for h in range(0, self.depth):
+        for h in range(self.depth):
             self._layers[h].build(
                 self._layers[h - 1].width if h != 0 else in_size,
                 weights[h] if weights else None,
@@ -125,10 +125,10 @@ class MLP:
             )
         ] if n_batches not in [0, 1] else [training_set]
 
-        for epoch in range(0, epochs):
+        for epoch in range(epochs):
 
             for batch in batches:
-                for instance in range(0, batch.size):
+                for instance in range(batch.size):
                     self._forward_propagation(batch.data[instance])
                     self._backward_propagation(batch.labels[instance])
                     self._update(
@@ -198,9 +198,10 @@ class MLP:
                     (target_f1 and target_f1 <= validation_f1)
                 )) or
                 (not weak_target and (
-                    (target_loss and target_loss >= validation_loss) and
-                    (target_accuracy and target_accuracy <= validation_accuracy) and
-                    (target_f1 and target_f1 <= validation_f1)
+                    (not target_loss or (target_loss and target_loss >= validation_loss)) and
+                    (not target_accuracy or (target_accuracy and target_accuracy <= validation_accuracy)) and
+                    (not target_f1 or (target_f1 and target_f1 <= validation_f1)) and
+                    (target_loss or target_accuracy or target_f1)
                 ))
             ):
                 break
