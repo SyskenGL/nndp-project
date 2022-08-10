@@ -87,7 +87,7 @@ class MLP:
         self,
         training_set: Set,
         validation_set: Set = None,
-        learning_rate: float = .001,
+        hyper_parameters: dict = None,
         n_batches: int = 1,
         epochs: int = 500,
         target_loss: float = None,
@@ -103,8 +103,6 @@ class MLP:
         if not validation_set and (target_loss or target_accuracy or target_f1):
             raise ValueError(f"expected a validation set.")
 
-        if not 0 < learning_rate <= 1:
-            raise ValueError("learning_rate must be in (0, 1].")
         if not 0 <= n_batches <= training_set.size:
             raise ValueError(f"n_batches must be in [0, {training_set.size}].")
         if epochs <= 0:
@@ -132,9 +130,8 @@ class MLP:
                     self._forward_propagation(batch.data[instance])
                     self._backward_propagation(batch.labels[instance])
                     self._update(
-                        learning_rate
-                        if (n_batches == 0 or instance == batch.size - 1)
-                        else None
+                        hyper_parameters,
+                        n_batches == 0 or instance == batch.size - 1
                     )
 
             training_predictions = np.array(
@@ -222,9 +219,9 @@ class MLP:
             delta = layer.backward_propagation(delta)
 
     @require_built
-    def _update(self, learning_rate) -> None:
+    def _update(self, hyper_parameters: dict, update: bool) -> None:
         for layer in self._layers:
-            layer.update(learning_rate)
+            layer.update(hyper_parameters, update)
 
     @property
     def name(self) -> str:

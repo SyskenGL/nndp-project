@@ -58,7 +58,7 @@ class Layer:
         raise NotImplementedError
 
     @require_built
-    def update(self, learning_rate: float = .001) -> None:
+    def update(self, hyper_parameters: dict, update: bool) -> None:
         raise NotImplementedError
 
     @property
@@ -192,11 +192,42 @@ class Dense(Layer):
         return self._activation.function()(in_weighted)
 
     @require_built
-    def update(self, learning_rate: float = None) -> None:
+    def update(self, hyper_parameters: dict = None, update: bool = False) -> None:
+        hyper_parameters = hyper_parameters if hyper_parameters else {}
+        eta = hyper_parameters.get("eta", 0.001)
+        if not 0 < eta <= 1:
+            raise ValueError("eta must be in (0, 1].")
         self._accumulated_weights_delta += (self._delta @ self._in_data.T)
         self._accumulated_biases_delta += self._delta
-        if learning_rate is not None:
-            self._weights -= learning_rate * self._accumulated_weights_delta
-            self._biases -= learning_rate * self._accumulated_biases_delta
+        if update:
+            self._weights -= eta * self._accumulated_weights_delta
+            self._biases -= eta * self._accumulated_biases_delta
             self._accumulated_weights_delta = np.zeros(self._weights.shape)
             self._accumulated_biases_delta = np.zeros(self._biases.shape)
+
+
+class ResilientDense(Dense):
+
+    def __init__(
+        self,
+        width: int,
+        activation: Activation = Activation.IDENTITY,
+        name: str = None,
+    ):
+        super().__init__(width, activation, name)
+
+    @require_built
+    def update(self, hyper_parameters: dict = None, update: bool = False) -> None:
+        hyper_parameters = hyper_parameters if hyper_parameters else {}
+        eta_max = hyper_parameters.get("eta_max", 1.2)
+        eta_min = hyper_parameters.get("eta_min", 0.5)
+        delta_max = hyper_parameters.get("delta_max", 50)
+        delta_min = hyper_parameters.get("delta_min", 1e-6)
+        if not eta_max > 1:
+            raise ValueError("eta_max must be in (1, inf).")
+        if not 0 < eta_min < 1:
+            raise ValueError("eta_min must be in (0, 1).")
+        self._accumulated_weights_delta += (self._delta @ self._in_data.T)
+        self._accumulated_biases_delta += self._delta
+        if update:
+            pass
