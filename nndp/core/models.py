@@ -87,13 +87,13 @@ class MLP:
         self,
         training_set: Set,
         validation_set: Set = None,
-        hyper_parameters: dict = None,
         n_batches: int = 1,
         epochs: int = 500,
         target_loss: float = None,
         target_accuracy: float = None,
         target_f1: float = None,
-        weak_target: bool = True
+        weak_target: bool = True,
+        **kwargs
     ) -> np.ndarray:
 
         if training_set.size == 0:
@@ -129,10 +129,7 @@ class MLP:
                 for instance in range(batch.size):
                     self._forward_propagation(batch.data[instance])
                     self._backward_propagation(batch.labels[instance])
-                    self._update(
-                        hyper_parameters,
-                        n_batches == 0 or instance == batch.size - 1
-                    )
+                    self._update(n_batches == 0 or instance == batch.size - 1, **kwargs)
 
             training_predictions = np.array(
                 [self.predict(x) for x in training_set.data]
@@ -219,9 +216,9 @@ class MLP:
             delta = layer.backward_propagation(delta)
 
     @require_built
-    def _update(self, hyper_parameters: dict, update: bool) -> None:
+    def _update(self, update: bool, **kwargs) -> None:
         for layer in self._layers:
-            layer.update(hyper_parameters, update)
+            layer.update(update, **kwargs)
 
     @property
     def name(self) -> str:

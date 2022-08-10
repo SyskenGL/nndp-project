@@ -58,7 +58,7 @@ class Layer:
         raise NotImplementedError
 
     @require_built
-    def update(self, hyper_parameters: dict, update: bool) -> None:
+    def update(self, update: bool, **kwargs) -> None:
         raise NotImplementedError
 
     @property
@@ -192,9 +192,8 @@ class Dense(Layer):
         return self._activation.function()(in_weighted)
 
     @require_built
-    def update(self, hyper_parameters: dict = None, update: bool = False) -> None:
-        hyper_parameters = hyper_parameters if hyper_parameters else {}
-        eta = hyper_parameters.get("eta", 0.001)
+    def update(self, update: bool = False, **kwargs) -> None:
+        eta = kwargs.get("eta", 0.001)
         if not 0 < eta <= 1:
             raise ValueError("eta must be in (0, 1].")
         self._accumulated_weights_delta += (self._delta @ self._in_data.T)
@@ -217,12 +216,11 @@ class ResilientDense(Dense):
         super().__init__(width, activation, name)
 
     @require_built
-    def update(self, hyper_parameters: dict = None, update: bool = False) -> None:
-        hyper_parameters = hyper_parameters if hyper_parameters else {}
-        eta_max = hyper_parameters.get("eta_max", 1.2)
-        eta_min = hyper_parameters.get("eta_min", 0.5)
-        delta_max = hyper_parameters.get("delta_max", 50)
-        delta_min = hyper_parameters.get("delta_min", 1e-6)
+    def update(self, update: bool = False, **kwargs) -> None:
+        eta_max = kwargs.get("eta_max", 1.2)
+        eta_min = kwargs.get("eta_min", 0.5)
+        delta_max = kwargs.get("delta_max", 50)
+        delta_min = kwargs.get("delta_min", 1e-6)
         if not eta_max > 1:
             raise ValueError("eta_max must be in (1, inf).")
         if not 0 < eta_min < 1:
