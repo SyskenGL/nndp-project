@@ -26,14 +26,6 @@ class Loader:
     def dataset(self) -> Set:
         raise NotImplementedError
 
-    @property
-    def data(self) -> np.ndarray:
-        raise NotImplementedError
-
-    @property
-    def labels(self) -> np.ndarray:
-        raise NotImplementedError
-
 
 class MNISTLoader(Loader):
 
@@ -88,11 +80,3 @@ class MNISTLoader(Loader):
     @property
     def dataset(self) -> Set:
         return self._dataset
-
-    @property
-    def data(self) -> np.ndarray:
-        return self._dataset.data
-
-    @property
-    def labels(self) -> np.ndarray:
-        return self._dataset.labels
