@@ -210,7 +210,6 @@ class MLP:
 
     @require_built
     def _backward_propagation(self, expected: np.ndarray) -> None:
-        expected = np.reshape(expected, (-1, 1))
         delta = self._loss.prime()(self.out_data, expected)
         for layer in reversed(self._layers):
             delta = layer.backward_propagation(delta)
