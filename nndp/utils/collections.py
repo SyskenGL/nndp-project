@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 
-class Set:
+class Dataset:
 
     def __init__(self, data: np.ndarray, labels: np.ndarray):
         if data.shape[1] != labels.shape[1]:
@@ -14,18 +14,36 @@ class Set:
         self._data = data
         self._labels = labels
 
-    @staticmethod
-    def split(dataset: Set, portion: float = 0.25) -> tuple[Set, Set]:
+    def split(self, portion: float = 0.25) -> tuple[Dataset, Dataset]:
         if not 0 < portion < 1:
             raise ValueError("portion must be in (0, 1).")
-        choices = np.random.permutation(dataset.size)
-        rt_dataset_size = int(dataset.size * portion)
-        lt_dataset_size = dataset.size - rt_dataset_size
-        rt_data = dataset.data[:, choices[lt_dataset_size:]]
-        rt_labels = dataset.labels[:, choices[lt_dataset_size:]]
-        lt_data = dataset.data[:, choices[:lt_dataset_size]]
-        lt_labels = dataset.labels[:, choices[:lt_dataset_size]]
-        return Set(lt_data, lt_labels), Set(rt_data, rt_labels)
+        choices = np.random.permutation(self.size)
+        rt_dataset_size = int(self.size * portion)
+        lt_dataset_size = self.size - rt_dataset_size
+        rt_data = self.data[:, choices[lt_dataset_size:]]
+        rt_labels = self.labels[:, choices[lt_dataset_size:]]
+        lt_data = self.data[:, choices[:lt_dataset_size]]
+        lt_labels = self.labels[:, choices[:lt_dataset_size]]
+        return Dataset(lt_data, lt_labels), Dataset(rt_data, rt_labels)
+
+    def k_fold(self, n_splits: int = 2, shuffle: bool = False):
+        if n_splits < 2:
+            raise ValueError("n_split must be greater than 2.")
+        shuffle = (
+            np.random.permutation(self.size)
+            if shuffle else np.arange(0, self.size)
+        )
+        data = np.array(np.array_split(self.data[:, shuffle], n_splits, axis=1))
+        labels = np.array(np.array_split(self.data[:, shuffle], n_splits, axis=1))
+        return [
+            (
+                Dataset(
+                    np.concatenate(np.delete(data, (k,), axis=0), axis=1),
+                    np.concatenate(np.delete(labels, (k,), axis=0), axis=1)
+                ),
+                Dataset(data[k], labels[k])
+            ) for k in range(n_splits)
+        ]
 
     def get_random_dataset(self, instances: int = 10000, scaled: bool = True):
         if instances >= self.size:
@@ -39,7 +57,7 @@ class Set:
         data = self.data[:, choices]
         labels = self.labels[:, choices]
         data = data / 255.0 if scaled else data
-        return Set(data, labels)
+        return Dataset(data, labels)
 
     @property
     def data(self) -> np.ndarray:
@@ -52,3 +70,10 @@ class Set:
     @property
     def size(self) -> int:
         return self._labels.shape[1]
+
+    @property
+    def shape(self) -> tuple:
+        return self._labels.shape
+
+    def __str__(self):
+        return f"{{data: {str(self.data)}, labels: {str(self.labels)}}}"

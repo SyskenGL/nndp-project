@@ -6,7 +6,7 @@ import numpy as np
 from tabulate import tabulate
 from nndp.core.layers import Layer
 from nndp.errors import EmptyModelError
-from nndp.utils.collections import Set
+from nndp.utils.collections import Dataset
 from nndp.utils.functions import Loss
 from nndp.utils.decorators import require_built
 from nndp.utils.decorators import require_not_built
@@ -85,8 +85,8 @@ class MLP:
     @require_built
     def fit(
         self,
-        training_set: Set,
-        validation_set: Set = None,
+        training_set: Dataset,
+        validation_set: Dataset = None,
         n_batches: int = 1,
         epochs: int = 500,
         target_loss: float = None,
@@ -115,7 +115,7 @@ class MLP:
 
         stats = []
         batches = [
-            Set(data, labels)
+            Dataset(data, labels)
             for data, labels in
             zip(
                 np.array_split(training_set.data, n_batches),

@@ -2,7 +2,7 @@
 import os
 import numpy as np
 from mnist import MNIST
-from nndp.utils.collections import Set
+from nndp.utils.collections import Dataset
 
 
 class Loader:
@@ -19,7 +19,7 @@ class Loader:
         raise NotImplementedError
 
     @property
-    def dataset(self) -> Set:
+    def dataset(self) -> Dataset:
         return self._dataset
 
 
@@ -31,7 +31,7 @@ class MNISTLoader(Loader):
         data, labels = self._mnist_data.load_training()
         data = np.array(data).T
         labels = MNISTLoader.encode(np.array(labels))
-        self._dataset = Set(data, labels)
+        self._dataset = Dataset(data, labels)
 
     @staticmethod
     def encode(labels: np.ndarray) -> np.ndarray:
