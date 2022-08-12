@@ -27,8 +27,10 @@ class Dataset:
         return Dataset(lt_data, lt_labels), Dataset(rt_data, rt_labels)
 
     def k_fold(self, n_splits: int = 2, shuffle: bool = False):
-        if n_splits < 2:
-            raise ValueError("n_split must be greater than 2.")
+        if not 1 < n_splits < self.data.shape[1]:
+            raise ValueError(
+                f"n_split must be greater in [2, {self.data.shape[1]}]."
+            )
         shuffle = (
             np.random.permutation(self.size)
             if shuffle else np.arange(0, self.size)

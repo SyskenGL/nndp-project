@@ -8,9 +8,9 @@ from nndp.core.layers import Layer
 from nndp.errors import EmptyModelError
 from nndp.utils.collections import Dataset
 from nndp.utils.functions import Loss
+from nndp.utils.metrics import Target, Metric
 from nndp.utils.decorators import require_built
 from nndp.utils.decorators import require_not_built
-from nndp.utils.metrics import accuracy_score, f1_score
 
 
 class MLP:
@@ -82,21 +82,33 @@ class MLP:
             out_data = layer.predict(out_data)
         return out_data
 
+    #TODO
     @require_built
-    def validate(self, validation_set: Dataset) -> tuple[float, float, float]:
+    def validate(
+        self,
+        validation_set: Dataset,
+        cross_validation: bool = False
+    ) -> tuple[float, float, float]:
+        pass
+        """
         if validation_set.size == 0:
             raise ValueError("provided an empty validation set.")
-        validation_predictions = self.predict(validation_set.data)
-        validation_loss = self._loss.function()(
-            validation_predictions, validation_set.labels
-        )
-        validation_accuracy = accuracy_score(
-            validation_predictions, validation_set.labels
-        )
-        validation_f1 = f1_score(
-            validation_predictions, validation_set.labels
-        )
-        return validation_loss, validation_accuracy, validation_f1
+
+        if cross_validation:
+            return 0.0, 0.0, 0.0
+        else:
+            validation_predictions = self.predict(validation_set.data)
+            validation_loss = self._loss.function()(
+                validation_predictions, validation_set.labels
+            )
+            validation_accuracy = accuracy_score(
+                validation_predictions, validation_set.labels
+            )
+            validation_f1 = f1_score(
+                validation_predictions, validation_set.labels
+            )
+            return validation_loss, validation_accuracy, validation_f1
+        """
 
     @require_built
     def fit(
@@ -105,10 +117,9 @@ class MLP:
         validation_set: Dataset = None,
         n_batches: int = 1,
         epochs: int = 500,
-        target_loss: float = None,
-        target_accuracy: float = None,
-        target_f1: float = None,
-        weak_target: bool = True,
+        targets: list[Target] = (),
+        weak_stop: bool = True,
+        stats: list[Metric] = (Metric.LOSS, Metric.ACCURACY, Metric.F1),
         **kwargs
     ) -> np.ndarray:
 
@@ -116,7 +127,7 @@ class MLP:
             raise ValueError("provided an empty training set.")
         if validation_set and validation_set.size == 0:
             raise ValueError("provided an empty validation set.")
-        if not validation_set and (target_loss or target_accuracy or target_f1):
+        if not validation_set and len(targets) != 0:
             raise ValueError(f"expected a validation set.")
 
         if not 0 <= n_batches <= training_set.size:
@@ -124,12 +135,14 @@ class MLP:
         if epochs <= 0:
             raise ValueError(f"epochs must be greater than 0.")
 
-        if target_accuracy and not 0 < target_accuracy < 1:
-            raise ValueError("target_accuracy must be in (0, 1).")
-        if target_f1 and not 0 < target_f1 < 1:
-            raise ValueError("target_f1 must be in (0, 1).")
+        metrics = [target.metric for target in targets]
+        if len(metrics) != len(set(metrics)):
+            raise ValueError(f"multiple targets with same metric provided.")
 
-        stats = []
+        if len(stats) != len(set(stats)):
+            raise ValueError(f"multiple stats with same metric provided.")
+
+        training_stats = []
         batches = [
             Dataset(data, labels)
             for data, labels in
@@ -152,69 +165,60 @@ class MLP:
             training_predictions = self.predict(training_set.data)
             validation_predictions = self.predict(validation_set.data)
 
-            training_loss = self._loss.function()(
-                training_predictions, training_set.labels
-            )
-            validation_loss = self._loss.function()(
-                validation_predictions, validation_set.labels
-            ) if validation_set else None
+            targets_satisfied = []
+            for target in targets:
+                if target.metric != Metric.LOSS:
+                    metric_function = target.metric.score()
+                else:
+                    metric_function = self._loss.function()
+                current_target = metric_function(
+                    validation_predictions,
+                    validation_set.labels
+                )
+                targets_satisfied.append(target.is_satisfied(current_target))
 
-            training_accuracy = accuracy_score(
-                training_predictions, training_set.labels
-            )
-            validation_accuracy = accuracy_score(
-                validation_predictions, validation_set.labels
-            ) if validation_set else None
+            epoch_stats = {"epoch": epoch, "training": {}, "validation": {}}
+            for metric in stats:
+                if metric != Metric.LOSS:
+                    metric_function = metric.score()
+                    metric_name = metric.name.lower()
+                else:
+                    metric_function = self._loss.function()
+                    metric_name = "loss"
+                epoch_stats["training"][metric_name] = metric_function(
+                    training_predictions,
+                    training_set.labels
+                )
+                epoch_stats["validation"][metric_name] = metric_function(
+                    validation_predictions,
+                    validation_set.labels
+                )
+            training_stats.append(epoch_stats)
 
-            training_f1 = f1_score(
-                training_predictions, training_set.labels
-            )
-            validation_f1 = f1_score(
-                validation_predictions, validation_set.labels
-            ) if validation_set else None
-
-            stats.append((
-                epoch,
-                training_loss, validation_loss,
-                training_accuracy, validation_accuracy,
-                training_f1, validation_f1
-            ))
-
-            self._logger.info(
-                f"\033[1m Epoch \033[0m{epoch + 1}/{epochs}\n\n"
-                f"\033[1m   • Training loss:\033[0m {training_loss:.3f}\n"
-                f"\033[1m   • Training accuracy:\033[0m {training_accuracy:.3f}\n"
-                f"\033[1m   • Training F1:\033[0m {training_f1:.3f}\n\n"
-                f"\033[1m   • Validation loss:\033[0m "
-                f"{format(validation_loss, '.3f') if validation_loss else '-'}\n"
-                f"\033[1m   • Validation accuracy:\033[0m "
-                f"{format(validation_accuracy, '.3f') if validation_accuracy else '-'}\n"
-                f"\033[1m   • Validation F1:\033[0m "
-                f"{format(validation_f1, '.3f') if validation_f1 else '-'}\n\n"
-                f"\033[1m   • Target loss:\033[0m "
-                f"{format(target_loss, '.3f') if target_loss else '-'}\n"
-                f"\033[1m   • Target accuracy:\033[0m "
-                f"{format(target_accuracy, '.3f') if target_accuracy else '-'}\n"
-                f"\033[1m   • Target F1:\033[0m "
-                f"{format(target_f1, '.3f') if target_f1 else '-'}"
-            )
+            log = f"\033[1m Epoch \033[0m{epoch + 1}/{epochs}\n"
+            for metric, value in epoch_stats["training"].items():
+                log += f"\n\033[1m   • Training {metric}:\033[0m {value:.3f}"
+            log += "\n"
+            for metric, value in epoch_stats["validation"].items():
+                log += f"\n\033[1m   • Validation {metric}:\033[0m {value:.3f}"
+            log += "\n"
+            for target in targets:
+                log += (
+                    f"\n\033[1m   • Target {target.metric.name.lower()}:"
+                    f"\033[0m {target.target:.3f}"
+                )
+            self._logger.info(log)
 
             if (
-                (weak_target and (
-                    (target_loss and target_loss >= validation_loss) or
-                    (target_accuracy and target_accuracy <= validation_accuracy) or
-                    (target_f1 and target_f1 <= validation_f1)
-                )) or
-                (not weak_target and (
-                    (not target_loss or (target_loss and target_loss >= validation_loss)) and
-                    (not target_accuracy or (target_accuracy and target_accuracy <= validation_accuracy)) and
-                    (not target_f1 or (target_f1 and target_f1 <= validation_f1)) and
-                    (target_loss or target_accuracy or target_f1)
-                ))
+                len(targets_satisfied) != 0 and
+                (
+                    weak_stop and any(targets_satisfied) or
+                    not weak_stop and all(targets_satisfied)
+                )
             ):
                 break
 
-        return np.array(stats)
+        return np.array(training_stats)
 
     @require_built
     def _forward_propagation(self, in_data: np.ndarray) -> None:
