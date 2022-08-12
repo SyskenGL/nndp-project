@@ -121,7 +121,7 @@ class MLP:
         weak_stop: bool = True,
         stats: list[Metric] = (Metric.LOSS, Metric.ACCURACY, Metric.F1),
         **kwargs
-    ) -> np.ndarray:
+    ) -> list:
 
         if training_set.size == 0:
             raise ValueError("provided an empty training set.")
@@ -218,7 +218,7 @@ class MLP:
             ):
                 break
 
-        return np.array(training_stats)
+        return training_stats
 
     @require_built
     def _forward_propagation(self, in_data: np.ndarray) -> None:
