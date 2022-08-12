@@ -83,6 +83,22 @@ class MLP:
         return out_data
 
     @require_built
+    def validate(self, validation_set: Dataset) -> tuple[float, float, float]:
+        if validation_set.size == 0:
+            raise ValueError("provided an empty validation set.")
+        validation_predictions = self.predict(validation_set.data)
+        validation_loss = self._loss.function()(
+            validation_predictions, validation_set.labels
+        )
+        validation_accuracy = accuracy_score(
+            validation_predictions, validation_set.labels
+        )
+        validation_f1 = f1_score(
+            validation_predictions, validation_set.labels
+        )
+        return validation_loss, validation_accuracy, validation_f1
+
+    @require_built
     def fit(
         self,
         training_set: Dataset,
