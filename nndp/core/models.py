@@ -127,16 +127,14 @@ class MLP:
 
             for batch in batches:
                 for instance in range(batch.size):
-                    self._forward_propagation(batch.data[instance])
-                    self._backward_propagation(batch.labels[instance])
+                    data = batch.data[:, instance].reshape(-1, 1)
+                    label = batch.labels[:, instance].reshape(-1, 1)
+                    self._forward_propagation(data)
+                    self._backward_propagation(label)
                     self._update(n_batches == 0 or instance == batch.size - 1, **kwargs)
 
-            training_predictions = np.array(
-                [self.predict(x) for x in training_set.data]
-            )
-            validation_predictions = np.array([
-                self.predict(x) for x in validation_set.data
-            ]) if validation_set else None
+            training_predictions = self.predict(training_set.data)
+            validation_predictions = self.predict(validation_set.data)
 
             training_loss = self._loss.function()(
                 training_predictions, training_set.labels

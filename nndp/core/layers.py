@@ -173,7 +173,6 @@ class Dense(Layer):
 
     @require_built
     def forward_propagation(self, in_data: np.ndarray) -> np.ndarray:
-        in_data = np.reshape(in_data, (-1, 1))
         self._in_data = in_data
         self._in_weighted = self._weights @ in_data + self._biases
         self._out_data = self._activation.function()(self._in_weighted)
@@ -181,13 +180,11 @@ class Dense(Layer):
 
     @require_built
     def backward_propagation(self, delta: np.ndarray) -> np.ndarray:
-        delta = np.reshape(delta, (-1, 1))
         self._delta = self._activation.prime()(self._in_weighted) * delta
         return self._weights.T @ self._delta
 
     @require_built
     def predict(self, in_data: np.ndarray) -> np.ndarray:
-        in_data = np.reshape(in_data, (-1, 1))
         in_weighted = self._weights @ in_data + self._biases
         return self._activation.function()(in_weighted)
 
