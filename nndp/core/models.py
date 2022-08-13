@@ -116,6 +116,42 @@ class MLP:
         return data
 
     @require_built
+    def cross_validate(
+        self,
+        dataset: Dataset,
+        n_splits: int = 5,
+        metrics: tuple[Metric] = (Metric.ACCURACY, Metric.F1),
+        epochs: int = 30,
+        n_batches: int = 1
+    ) -> dict:
+
+        if metrics is None or len(metrics) == 0:
+            raise ValueError("no metrics provided.")
+        if len(metrics) != len(set(metrics)):
+            raise ValueError(f"multiple same metric provided.")
+
+        scores = []
+        models = [deepcopy(self) for _ in range(n_splits)]
+        k_fold = dataset.k_fold(n_splits)
+        for k in range(n_splits):
+            self._logger.info(
+                f"\033[1m • Cross validation of the model {self._name}"
+                f" - {k + 1} of {n_splits}\033[0m"
+            )
+            training_set, validation_set = k_fold[k]
+            models[k].fit(
+                training_set, n_batches=n_batches, epochs=epochs, stats=None
+            )
+            scores.append(models[k].validate(validation_set, metrics))
+        scores = {k: [d.get(k) for d in scores] for k in set().union(*scores)}
+
+        result = {}
+        for key in scores.keys():
+            values = np.array(scores[key])
+            result[key] = (values.mean(), values.std())
+        return result
+
+    @require_built
     def fit(
         self,
         training_set: Dataset,
@@ -234,42 +270,6 @@ class MLP:
                 break
 
         return training_stats
-
-    @require_built
-    def cross_validate(
-        self,
-        dataset: Dataset,
-        n_splits: int = 5,
-        metrics: tuple[Metric] = (Metric.ACCURACY, Metric.F1),
-        epochs: int = 30,
-        n_batches: int = 1
-    ) -> dict:
-
-        if metrics is None or len(metrics) == 0:
-            raise ValueError("no metrics provided.")
-        if len(metrics) != len(set(metrics)):
-            raise ValueError(f"multiple same metric provided.")
-
-        scores = []
-        models = [deepcopy(self) for _ in range(n_splits)]
-        k_fold = dataset.k_fold(n_splits)
-        for k in range(n_splits):
-            self._logger.info(
-                f"\033[1m • Cross validation of the model {self._name}"
-                f" - {k + 1} of {n_splits}\033[0m"
-            )
-            training_set, validation_set = k_fold[k]
-            models[k].fit(
-                training_set, n_batches=n_batches, epochs=epochs, stats=None
-            )
-            scores.append(models[k].validate(validation_set, metrics))
-        scores = {k: [d.get(k) for d in scores] for k in set().union(*scores)}
-
-        result = {}
-        for key in scores.keys():
-            values = np.array(scores[key])
-            result[key] = (values.mean(), values.std())
-        return result
 
     @require_built
     def _forward_propagation(self, in_data: np.ndarray) -> None:
