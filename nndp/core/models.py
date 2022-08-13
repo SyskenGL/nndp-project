@@ -2,10 +2,7 @@
 from __future__ import annotations
 import uuid
 import logging
-import operator
-import functools
 import numpy as np
-import collections
 from copy import deepcopy
 from typing import Optional
 from tabulate import tabulate
@@ -238,6 +235,7 @@ class MLP:
 
         return training_stats
 
+    @require_built
     def cross_validate(
         self,
         dataset: Dataset,
