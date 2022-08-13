@@ -2,6 +2,8 @@
 from __future__ import annotations
 import uuid
 import numpy as np
+from copy import deepcopy
+from typing import Optional
 from tabulate import tabulate
 from nndp.utils.functions import Activation
 from nndp.utils.decorators import require_built
@@ -14,7 +16,7 @@ class Layer:
         self,
         width: int,
         activation: Activation = Activation.IDENTITY,
-        name: str = None,
+        name: Optional[str] = None,
     ):
         if width <= 0:
             raise ValueError(
@@ -32,6 +34,7 @@ class Layer:
         self._out_data = None
         self._weights = None
         self._biases = None
+        self._copies = 0
 
     def is_built(self) -> bool:
         return (
@@ -44,8 +47,8 @@ class Layer:
     def build(
         self,
         in_size: int,
-        weights: np.ndarray = None,
-        biases: np.ndarray = None
+        weights: Optional[np.ndarray] = None,
+        biases: Optional[np.ndarray] = None
     ) -> None:
         raise NotImplementedError
 
@@ -99,7 +102,10 @@ class Layer:
 
     @property
     def n_trainable(self) -> int:
-        return self._weights.size + self._biases.size if self.is_built() else 0
+        return (
+            self._weights.size + self._biases.size
+            if self.is_built() else 0
+        )
 
     def __str__(self) -> str:
         return str(tabulate([[
@@ -124,6 +130,17 @@ class Layer:
             colalign=["center"] * 7
         ))
 
+    def __deepcopy__(self, memodict: Optional[dict] = None) -> Layer:
+        memodict = {} if memodict is None else memodict
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memodict[id(self)] = result
+        for k, v in self.__dict__.items():
+            setattr(result, k, deepcopy(v, memodict))
+        self._copies += 1
+        self._name += f"_C{self._copies}"
+        return result
+
 
 class Dense(Layer):
 
@@ -131,7 +148,7 @@ class Dense(Layer):
         self,
         width: int,
         activation: Activation = Activation.IDENTITY,
-        name: str = None,
+        name: Optional[str] = None,
     ):
         super().__init__(width, activation, name)
         self._delta = None
@@ -142,8 +159,8 @@ class Dense(Layer):
     def build(
         self,
         in_size: int,
-        weights: np.ndarray = None,
-        biases: np.ndarray = None
+        weights: Optional[np.ndarray] = None,
+        biases: Optional[np.ndarray] = None
     ) -> None:
         if in_size <= 0:
             raise ValueError(
@@ -208,7 +225,7 @@ class ResilientDense(Dense):
         self,
         width: int,
         activation: Activation = Activation.IDENTITY,
-        name: str = None,
+        name: Optional[str] = None,
     ):
         super().__init__(width, activation, name)
         self._last_accumulated_weights_delta = None

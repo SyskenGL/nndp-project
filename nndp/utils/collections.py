@@ -36,7 +36,7 @@ class Dataset:
             if shuffle else np.arange(0, self.size)
         )
         data = np.array(np.array_split(self.data[:, shuffle], n_splits, axis=1))
-        labels = np.array(np.array_split(self.data[:, shuffle], n_splits, axis=1))
+        labels = np.array(np.array_split(self.labels[:, shuffle], n_splits, axis=1))
         return [
             (
                 Dataset(
@@ -78,4 +78,4 @@ class Dataset:
         return self._labels.shape
 
     def __str__(self):
-        return f"{{data: {str(self.data)}, labels: {str(self.labels)}}}"
+        return f"{{data: {str(self.data.shape)}, labels: {str(self.labels.shape)}}}"

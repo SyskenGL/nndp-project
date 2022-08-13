@@ -2,7 +2,12 @@
 from __future__ import annotations
 import uuid
 import logging
+import operator
+import functools
 import numpy as np
+import collections
+from copy import deepcopy
+from typing import Optional
 from tabulate import tabulate
 from nndp.core.layers import Layer
 from nndp.errors import EmptyModelError
@@ -19,7 +24,7 @@ class MLP:
         self,
         layers: list[Layer] = None,
         loss: Loss = Loss.SSE,
-        name: str = None,
+        name: Optional[str] = None,
     ):
         self._name = (
             name if name is not None
@@ -27,6 +32,7 @@ class MLP:
         )
         self._layers = layers if layers else []
         self._loss = loss
+        self._copies = 0
         self._logger = logging.getLogger(self._name)
 
     def is_built(self) -> bool:
@@ -39,8 +45,8 @@ class MLP:
     def build(
         self,
         in_size: int,
-        weights: list[np.ndarray] = None,
-        biases: list[np.ndarray] = None
+        weights: Optional[list[np.ndarray]] = None,
+        biases: Optional[list[np.ndarray]] = None
     ) -> None:
         if len(self._layers) == 0:
             raise EmptyModelError(
@@ -82,46 +88,51 @@ class MLP:
             out_data = layer.predict(out_data)
         return out_data
 
-    #TODO
     @require_built
     def validate(
         self,
         validation_set: Dataset,
-        cross_validation: bool = False
-    ) -> tuple[float, float, float]:
-        pass
-        """
+        metrics: tuple[Metric] = (Metric.LOSS, Metric.ACCURACY, Metric.F1)
+    ) -> dict:
+
         if validation_set.size == 0:
             raise ValueError("provided an empty validation set.")
+        if metrics is None or len(metrics) == 0:
+            raise ValueError("no metrics provided.")
+        if len(metrics) != len(set(metrics)):
+            raise ValueError(f"multiple same metric provided.")
 
-        if cross_validation:
-            return 0.0, 0.0, 0.0
-        else:
-            validation_predictions = self.predict(validation_set.data)
-            validation_loss = self._loss.function()(
-                validation_predictions, validation_set.labels
+        data = {}
+        validation_predictions = self.predict(validation_set.data)
+
+        for metric in metrics:
+            if metric != Metric.LOSS:
+                metric_function = metric.score()
+                metric_name = metric.name.lower()
+            else:
+                metric_function = self._loss.function()
+                metric_name = "loss"
+            data[metric_name] = metric_function(
+                validation_predictions,
+                validation_set.labels
             )
-            validation_accuracy = accuracy_score(
-                validation_predictions, validation_set.labels
-            )
-            validation_f1 = f1_score(
-                validation_predictions, validation_set.labels
-            )
-            return validation_loss, validation_accuracy, validation_f1
-        """
+        return data
 
     @require_built
     def fit(
         self,
         training_set: Dataset,
-        validation_set: Dataset = None,
+        validation_set: Optional[Dataset] = None,
         n_batches: int = 1,
         epochs: int = 500,
-        targets: list[Target] = (),
+        targets: Optional[tuple[Target]] = None,
         weak_stop: bool = True,
-        stats: list[Metric] = (Metric.LOSS, Metric.ACCURACY, Metric.F1),
+        stats: Optional[tuple[Metric]] = (Metric.LOSS, Metric.ACCURACY, Metric.F1),
         **kwargs
     ) -> list:
+
+        targets = [] if targets is None else targets
+        stats = [] if stats is None else stats
 
         if training_set.size == 0:
             raise ValueError("provided an empty training set.")
@@ -135,10 +146,9 @@ class MLP:
         if epochs <= 0:
             raise ValueError(f"epochs must be greater than 0.")
 
-        metrics = [target.metric for target in targets]
-        if len(metrics) != len(set(metrics)):
+        target_metrics = [target.metric for target in targets]
+        if len(target_metrics) != len(set(target_metrics)):
             raise ValueError(f"multiple targets with same metric provided.")
-
         if len(stats) != len(set(stats)):
             raise ValueError(f"multiple stats with same metric provided.")
 
@@ -160,10 +170,15 @@ class MLP:
                     label = batch.labels[:, instance].reshape(-1, 1)
                     self._forward_propagation(data)
                     self._backward_propagation(label)
-                    self._update(n_batches == 0 or instance == batch.size - 1, **kwargs)
+                    self._update(
+                        n_batches == 0 or instance == batch.size - 1, **kwargs
+                    )
 
             training_predictions = self.predict(training_set.data)
-            validation_predictions = self.predict(validation_set.data)
+            validation_predictions = (
+                self.predict(validation_set.data)
+                if validation_set is not None else None
+            )
 
             targets_satisfied = []
             for target in targets:
@@ -177,37 +192,40 @@ class MLP:
                 )
                 targets_satisfied.append(target.is_satisfied(current_target))
 
-            epoch_stats = {"epoch": epoch, "training": {}, "validation": {}}
-            for metric in stats:
-                if metric != Metric.LOSS:
-                    metric_function = metric.score()
-                    metric_name = metric.name.lower()
-                else:
-                    metric_function = self._loss.function()
-                    metric_name = "loss"
-                epoch_stats["training"][metric_name] = metric_function(
-                    training_predictions,
-                    training_set.labels
-                )
-                epoch_stats["validation"][metric_name] = metric_function(
-                    validation_predictions,
-                    validation_set.labels
-                )
-            training_stats.append(epoch_stats)
+            if len(stats) != 0:
 
-            log = f"\033[1m Epoch \033[0m{epoch + 1}/{epochs}\n"
-            for metric, value in epoch_stats["training"].items():
-                log += f"\n\033[1m   • Training {metric}:\033[0m {value:.3f}"
-            log += "\n"
-            for metric, value in epoch_stats["validation"].items():
-                log += f"\n\033[1m   • Validation {metric}:\033[0m {value:.3f}"
-            log += "\n"
-            for target in targets:
-                log += (
-                    f"\n\033[1m   • Target {target.metric.name.lower()}:"
-                    f"\033[0m {target.target:.3f}"
-                )
-            self._logger.info(log)
+                epoch_stats = {"epoch": epoch, "training": {}, "validation": {}}
+                for metric in stats:
+                    if metric != Metric.LOSS:
+                        metric_function = metric.score()
+                        metric_name = metric.name.lower()
+                    else:
+                        metric_function = self._loss.function()
+                        metric_name = "loss"
+                    epoch_stats["training"][metric_name] = metric_function(
+                        training_predictions,
+                        training_set.labels
+                    )
+                    if validation_set is not None:
+                        epoch_stats["validation"][metric_name] = metric_function(
+                            validation_predictions,
+                            validation_set.labels
+                        )
+                training_stats.append(epoch_stats)
+
+                log = f"\033[1m Epoch \033[0m{epoch + 1} of {epochs}\n"
+                for metric, value in epoch_stats["training"].items():
+                    log += f"\n\033[1m   • Training {metric}:\033[0m {value:.3f}"
+                log += "\n"
+                for metric, value in epoch_stats["validation"].items():
+                    log += f"\n\033[1m   • Validation {metric}:\033[0m {value:.3f}"
+                log += "\n"
+                for target in targets:
+                    log += (
+                        f"\n\033[1m   • Target {target.metric.name.lower()}:"
+                        f"\033[0m {target.target:.3f}"
+                    )
+                self._logger.info(log)
 
             if (
                 len(targets_satisfied) != 0 and
@@ -219,6 +237,41 @@ class MLP:
                 break
 
         return training_stats
+
+    def cross_validate(
+        self,
+        dataset: Dataset,
+        n_splits: int = 5,
+        metrics: tuple[Metric] = (Metric.ACCURACY, Metric.F1),
+        epochs: int = 30,
+        n_batches: int = 1
+    ) -> dict:
+
+        if metrics is None or len(metrics) == 0:
+            raise ValueError("no metrics provided.")
+        if len(metrics) != len(set(metrics)):
+            raise ValueError(f"multiple same metric provided.")
+
+        scores = []
+        models = [deepcopy(self) for _ in range(n_splits)]
+        k_fold = dataset.k_fold(n_splits)
+        for k in range(n_splits):
+            self._logger.info(
+                f"\033[1m • Cross validation of the model {self._name}"
+                f" - {k + 1} of {n_splits}\033[0m"
+            )
+            training_set, validation_set = k_fold[k]
+            models[k].fit(
+                training_set, n_batches=n_batches, epochs=epochs, stats=None
+            )
+            scores.append(models[k].validate(validation_set, metrics))
+        scores = {k: [d.get(k) for d in scores] for k in set().union(*scores)}
+
+        result = {}
+        for key in scores.keys():
+            values = np.array(scores[key])
+            result[key] = (values.mean(), values.std())
+        return result
 
     @require_built
     def _forward_propagation(self, in_data: np.ndarray) -> None:
@@ -287,7 +340,7 @@ class MLP:
             if self.is_built() else 0
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         details = str(tabulate(
             [
                 ["\033[1m TYPE \033[0m", self.__class__.__name__],
@@ -337,3 +390,14 @@ class MLP:
             tablefmt="fancy_grid",
             colalign=["center"] * 3
         ))
+
+    def __deepcopy__(self, memodict: Optional[dict] = None) -> MLP:
+        memodict = {} if memodict is None else memodict
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memodict[id(self)] = result
+        for k, v in self.__dict__.items():
+            setattr(result, k, deepcopy(v, memodict))
+        self._copies += 1
+        result._name += f"_C{self._copies}"
+        return result
