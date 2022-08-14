@@ -89,7 +89,7 @@ class MLP:
     def validate(
         self,
         validation_set: Dataset,
-        metrics: tuple[Metric] = (Metric.LOSS, Metric.ACCURACY, Metric.F1)
+        metrics: list[Metric] = (Metric.LOSS, Metric.ACCURACY, Metric.F1)
     ) -> dict:
 
         if validation_set.size == 0:
@@ -120,7 +120,7 @@ class MLP:
         self,
         dataset: Dataset,
         n_splits: int = 5,
-        metrics: tuple[Metric] = (Metric.ACCURACY, Metric.F1),
+        metrics: list[Metric] = (Metric.ACCURACY, Metric.F1),
         epochs: int = 30,
         n_batches: int = 1
     ) -> dict:
@@ -158,9 +158,9 @@ class MLP:
         validation_set: Optional[Dataset] = None,
         n_batches: int = 1,
         epochs: int = 500,
-        targets: Optional[tuple[Target]] = None,
+        targets: Optional[list[Target]] = None,
         weak_stop: bool = True,
-        stats: Optional[tuple[Metric]] = (Metric.LOSS, Metric.ACCURACY, Metric.F1),
+        stats: Optional[list[Metric]] = (Metric.LOSS, Metric.ACCURACY, Metric.F1),
         **kwargs
     ) -> list:
 
@@ -212,6 +212,9 @@ class MLP:
                 self.predict(validation_set.data)
                 if validation_set is not None else None
             )
+
+            a = np.random.randint(0, training_set.size)
+            print(np.argmax(training_predictions[:,a]), np.argmax(training_set.labels[:,a]))
 
             targets_satisfied = []
             for target in targets:
@@ -328,11 +331,11 @@ class MLP:
         return self._layers[-1].out_data if len(self._layers) else None
 
     @property
-    def layers(self) -> tuple[Layer]:
-        return tuple(self._layers)
+    def layers(self) -> list[Layer]:
+        return list(self._layers)
 
     @property
-    def n_trainable(self) -> tuple[Layer]:
+    def n_trainable(self) -> int:
         return (
             sum([layer.weights.size + layer.biases.size for layer in self._layers])
             if self.is_built() else 0
