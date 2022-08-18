@@ -15,10 +15,13 @@ class Dataset:
         self._labels = labels
 
     def split(self, portion: float = 0.25) -> tuple[Dataset, Dataset]:
-        if not 0 < portion < 1:
-            raise ValueError("portion must be in (0, 1).")
+        if not 0 < portion <= self.size:
+            raise ValueError(f"portion must be in (0, {self.size}].")
         choices = np.random.permutation(self.size)
-        rt_dataset_size = int(self.size * portion)
+        rt_dataset_size = (
+            int(self.size * portion)
+            if (0 < portion < 1) else portion
+        )
         lt_dataset_size = self.size - rt_dataset_size
         rt_data = self.data[:, choices[lt_dataset_size:]]
         rt_labels = self.labels[:, choices[lt_dataset_size:]]
