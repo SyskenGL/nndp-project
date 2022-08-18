@@ -185,6 +185,7 @@ class Dense(Layer):
             biases if biases is not None
             else .1 * np.random.randn(self._width, 1)
         )
+        self._delta = np.zeros(self._biases.shape)
         self._accumulated_weights_delta = np.zeros(self._weights.shape)
         self._accumulated_biases_delta = np.zeros(self._biases.shape)
 
