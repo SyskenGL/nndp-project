@@ -213,9 +213,6 @@ class MLP:
                 if validation_set is not None else None
             )
 
-            a = np.random.randint(0, training_set.size)
-            print(np.argmax(training_predictions[:,a]), np.argmax(training_set.labels[:,a]))
-
             targets_satisfied = []
             for target in targets:
                 if target.metric != Metric.LOSS:

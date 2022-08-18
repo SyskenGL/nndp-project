@@ -3,6 +3,9 @@ import numpy as np
 from enum import Enum
 
 
+np.seterr(over="ignore")
+
+
 def identity(x: np.ndarray) -> np.ndarray:
     return x
 
