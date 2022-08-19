@@ -22,6 +22,10 @@ class Loader:
     def dataset(self) -> Dataset:
         return self._dataset
 
+    @property
+    def scaled_dataset(self) -> Dataset:
+        raise NotImplementedError
+
 
 class MNISTLoader(Loader):
 
@@ -45,3 +49,9 @@ class MNISTLoader(Loader):
         return np.array([
             np.argmax(labels[:, n]) for n in range(labels.shape[1])
         ])
+
+    @property
+    def scaled_dataset(self) -> Dataset:
+        return Dataset(
+            self.dataset.data / 255.0, self.dataset.labels
+        )

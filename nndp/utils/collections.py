@@ -50,7 +50,7 @@ class Dataset:
             ) for k in range(n_splits)
         ]
 
-    def get_random_dataset(self, instances: int = 10000, scaled: bool = True):
+    def random(self, instances: int = 10000):
         if instances >= self.size:
             raise ValueError(
                 f"too many instances requested - "
@@ -61,7 +61,6 @@ class Dataset:
         )
         data = self.data[:, choices]
         labels = self.labels[:, choices]
-        data = data / 255.0 if scaled else data
         return Dataset(data, labels)
 
     @property
@@ -80,5 +79,5 @@ class Dataset:
     def shape(self) -> tuple:
         return self._labels.shape
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{{data: {str(self.data.shape)}, labels: {str(self.labels.shape)}}}"
