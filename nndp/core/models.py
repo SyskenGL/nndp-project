@@ -265,8 +265,7 @@ class MLP:
                 self._logger.info(log)
 
             if (
-                len(targets_satisfied) != 0 and
-                (
+                len(targets_satisfied) != 0 and (
                     weak_stop and any(targets_satisfied) or
                     not weak_stop and all(targets_satisfied)
                 )
