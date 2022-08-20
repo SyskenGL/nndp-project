@@ -190,8 +190,8 @@ class MLP:
             Dataset(data, labels)
             for data, labels in
             zip(
-                np.array_split(training_set.data, n_batches),
-                np.array_split(training_set.labels, n_batches)
+                np.array_split(training_set.data, n_batches, axis=1),
+                np.array_split(training_set.labels, n_batches, axis=1)
             )
         ] if n_batches not in [0, 1] else [training_set]
 
@@ -246,7 +246,11 @@ class MLP:
                         )
                 training_stats.append(epoch_stats)
 
-                log = f"\033[1m Epoch \033[0m{epoch + 1} of {epochs}\n"
+                learning_method = (
+                    "on-line" if (n_batches == 0 or n_batches == training_set.size) else
+                    ("full-batch" if n_batches == 1 else "mini-batch")
+                )
+                log = f"\033[1m Epoch \033[0m{epoch + 1} of {epochs} - [{learning_method}]\n"
                 for metric, value in epoch_stats["training"].items():
                     log += f"\n\033[1m   • Training {metric}:\033[0m {value:.3f}"
                 log += "\n"
