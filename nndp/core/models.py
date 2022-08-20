@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 from __future__ import annotations
+import os
 import uuid
 import logging
+import pickle
+import pickletools
+import nndp.data
 import numpy as np
 from copy import deepcopy
 from typing import Optional
@@ -340,6 +344,22 @@ class MLP:
             sum([layer.weights.size + layer.biases.size for layer in self._layers])
             if self.is_built() else 0
         )
+
+    def save(self, path: str = None):
+        if path is None:
+            path = os.path.join(os.path.dirname(nndp.data.__file__), "saved")
+            if not os.path.isdir(path):
+                os.mkdir(path)
+            path = os.path.join(path, f"{self._name}.net")
+        with open(path, "wb") as file:
+            pickled = pickle.dumps(self)
+            file.write(pickletools.optimize(pickled))
+
+    @staticmethod
+    def load(path: str):
+        with open(path, "rb") as file:
+            unpickled = pickle.Unpickler(file)
+            return unpickled.load()
 
     def __str__(self) -> str:
         details = str(tabulate(
