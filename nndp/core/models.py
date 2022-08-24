@@ -93,7 +93,7 @@ class MLP:
     def validate(
         self,
         validation_set: Dataset,
-        metrics: list[Metric] = (Metric.LOSS, Metric.ACCURACY, Metric.F1)
+        metrics: list[Metric] = (Metric.LOSS,)
     ) -> dict:
 
         if validation_set.size == 0:
@@ -124,7 +124,7 @@ class MLP:
         self,
         dataset: Dataset,
         n_splits: int = 5,
-        metrics: list[Metric] = (Metric.ACCURACY, Metric.F1),
+        metrics: list[Metric] = (Metric.LOSS,),
         epochs: int = 30,
         n_batches: int = 1
     ) -> dict:
@@ -164,7 +164,7 @@ class MLP:
         epochs: int = 500,
         targets: Optional[list[Target]] = None,
         weak_stop: bool = True,
-        stats: Optional[list[Metric]] = (Metric.LOSS, Metric.ACCURACY, Metric.F1),
+        stats: Optional[list[Metric]] = (Metric.LOSS,),
         **kwargs
     ) -> list:
 
