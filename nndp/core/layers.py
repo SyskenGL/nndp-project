@@ -138,7 +138,7 @@ class Layer:
         for k, v in self.__dict__.items():
             setattr(result, k, deepcopy(v, memodict))
         self._copies += 1
-        self._name += f"_C{self._copies}"
+        self._name += f"_CL{self._copies}"
         return result
 
 

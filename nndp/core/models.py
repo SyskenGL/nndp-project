@@ -135,19 +135,22 @@ class MLP:
             raise ValueError(f"multiple same metric provided.")
 
         scores = []
-        models = [deepcopy(self) for _ in range(n_splits)]
         k_fold = dataset.k_fold(n_splits)
-        for k in range(n_splits):
+
+        for k, (training_set, validation_set) in enumerate(k_fold):
+            model = deepcopy(self)
             self._logger.info(
-                f"\033[1m • Cross validation of the model {self._name}"
+                f"\033[1m • Cross validation of the model {model._name}"
                 f" - {k + 1} of {n_splits}\033[0m"
             )
-            training_set, validation_set = k_fold[k]
-            models[k].fit(
+            model.fit(
                 training_set, n_batches=n_batches, epochs=epochs, stats=None
             )
-            scores.append(models[k].validate(validation_set, metrics))
-        scores = {k: [d.get(k) for d in scores] for k in set().union(*scores)}
+            scores.append(model.validate(validation_set, metrics))
+        scores = {
+            metric: [score.get(metric) for score in scores]
+            for metric in set().union(*scores)
+        }
 
         result = {}
         for key in scores.keys():
@@ -420,5 +423,5 @@ class MLP:
         for k, v in self.__dict__.items():
             setattr(result, k, deepcopy(v, memodict))
         self._copies += 1
-        result._name += f"_C{self._copies}"
+        result._name += f"_CL{self._copies}"
         return result
