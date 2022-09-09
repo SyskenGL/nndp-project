@@ -210,9 +210,8 @@ class MLP:
                     label = batch.labels[:, instance].reshape(-1, 1)
                     self._forward_propagation(data)
                     self._backward_propagation(label)
-                    self._update(
-                        n_batches == 0 or instance == batch.size - 1, **kwargs
-                    )
+                    if n_batches == 0 or instance == batch.size - 1:
+                        self._update(**kwargs)
 
             training_predictions = self.predict(training_set.data)
             validation_predictions = (
@@ -294,9 +293,9 @@ class MLP:
             delta = layer.backward_propagation(delta)
 
     @require_built
-    def _update(self, update: bool, **kwargs) -> None:
+    def _update(self, **kwargs) -> None:
         for layer in self._layers:
-            layer.update(update, **kwargs)
+            layer.update(**kwargs)
 
     @property
     def name(self) -> str:

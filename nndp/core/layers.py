@@ -61,7 +61,7 @@ class Layer:
         raise NotImplementedError
 
     @require_built
-    def update(self, update: bool, **kwargs) -> None:
+    def update(self, **kwargs) -> None:
         raise NotImplementedError
 
     @property
@@ -151,9 +151,8 @@ class Dense(Layer):
         name: Optional[str] = None,
     ):
         super().__init__(width, activation, name)
-        self._delta = None
-        self._accumulated_weights_delta = None
-        self._accumulated_biases_delta = None
+        self._weights_derivative = None
+        self._biases_derivative = None
 
     @require_not_built
     def build(
@@ -185,9 +184,8 @@ class Dense(Layer):
             biases if biases is not None
             else .1 * np.random.randn(self._width, 1)
         )
-        self._delta = np.zeros(self._biases.shape)
-        self._accumulated_weights_delta = np.zeros(self._weights.shape)
-        self._accumulated_biases_delta = np.zeros(self._biases.shape)
+        self._weights_derivative = np.zeros(self._weights.shape)
+        self._biases_derivative = np.zeros(self._biases.shape)
 
     @require_built
     def forward_propagation(self, in_data: np.ndarray) -> np.ndarray:
@@ -198,8 +196,10 @@ class Dense(Layer):
 
     @require_built
     def backward_propagation(self, delta: np.ndarray) -> np.ndarray:
-        self._delta = self._activation.prime()(self._in_weighted) * delta
-        return self._weights.T @ self._delta
+        delta = self._activation.prime()(self._in_weighted) * delta
+        self._weights_derivative += (delta @ self._in_data.T)
+        self._biases_derivative += delta
+        return self._weights.T @ delta
 
     @require_built
     def predict(self, in_data: np.ndarray) -> np.ndarray:
@@ -207,17 +207,14 @@ class Dense(Layer):
         return self._activation.function()(in_weighted)
 
     @require_built
-    def update(self, update: bool = False, **kwargs) -> None:
+    def update(self, **kwargs) -> None:
         eta = kwargs.get("eta", 0.001)
         if not 0 < eta <= 1:
             raise ValueError("eta must be in (0, 1].")
-        self._accumulated_weights_delta += (self._delta @ self._in_data.T)
-        self._accumulated_biases_delta += self._delta
-        if update:
-            self._weights -= eta * self._accumulated_weights_delta
-            self._biases -= eta * self._accumulated_biases_delta
-            self._accumulated_weights_delta = np.zeros(self._weights.shape)
-            self._accumulated_biases_delta = np.zeros(self._biases.shape)
+        self._weights -= eta * self._weights_derivative
+        self._biases -= eta * self._biases_derivative
+        self._weights_derivative = np.zeros(self._weights.shape)
+        self._biases_derivative = np.zeros(self._biases.shape)
 
 
 class ResilientDense(Dense):
@@ -229,13 +226,13 @@ class ResilientDense(Dense):
         name: Optional[str] = None,
     ):
         super().__init__(width, activation, name)
-        self._last_accumulated_weights_delta = None
-        self._last_accumulated_bias_delta = None
+        self._last_weights_derivative = None
+        self._last_biases_derivative = None
         self._weights_delta = None
         self._biases_delta = None
 
     @require_built
-    def update(self, update: bool = False, **kwargs) -> None:
+    def update(self, **kwargs) -> None:
 
         eta_positive = kwargs.get("eta_positive", 1.2)
         eta_negative = kwargs.get("eta_negative", 0.5)
@@ -248,99 +245,90 @@ class ResilientDense(Dense):
         if not 0 < eta_negative < 1:
             raise ValueError("eta_negative must be in (0, 1).")
 
-        self._accumulated_weights_delta += self._delta @ self._in_data.T
-        self._accumulated_biases_delta += self._delta
-
-        if update:
-
-            if (
-                self._last_accumulated_weights_delta is None
-                or self._last_accumulated_bias_delta is None
-            ):
-                self._last_accumulated_weights_delta = np.zeros(
-                    self._accumulated_weights_delta.shape
-                )
-                self._last_accumulated_bias_delta = np.zeros(
-                    self._accumulated_biases_delta.shape
-                )
-                self._weights_delta = (
-                    np.ones(self._accumulated_weights_delta.shape) * delta_zero
-                )
-                self._biases_delta = (
-                    np.ones(self._accumulated_biases_delta.shape) * delta_zero
-                )
-
-            same_sign = (
-                self._accumulated_weights_delta *
-                self._last_accumulated_weights_delta > 0
+        if (
+            self._last_weights_derivative is None
+            or self._last_biases_derivative is None
+        ):
+            self._last_weights_derivative = np.zeros(self._weights_derivative.shape)
+            self._last_biases_derivative = np.zeros(self._biases_derivative.shape)
+            self._weights_delta = (
+                np.ones(self._weights_derivative.shape) * delta_zero
             )
-            self._weights_delta[same_sign] = np.minimum(
-                self._weights_delta[same_sign] * eta_positive, delta_max
-            )
-            self._weights[same_sign] -= (
-                np.sign(self._accumulated_weights_delta[same_sign]) *
-                self._weights_delta[same_sign]
-            )
-            self._last_accumulated_weights_delta[same_sign] = (
-                self._accumulated_weights_delta[same_sign]
+            self._biases_delta = (
+                np.ones(self._biases_derivative.shape) * delta_zero
             )
 
-            diff_sign = (
-                self._accumulated_weights_delta *
-                self._last_accumulated_weights_delta < 0
-            )
-            self._weights_delta[diff_sign] = np.maximum(
-                self._weights_delta[diff_sign] * eta_negative, delta_min
-            )
-            self._last_accumulated_weights_delta[diff_sign] = 0
+        same_sign = (
+            self._weights_derivative *
+            self._last_weights_derivative > 0
+        )
+        self._weights_delta[same_sign] = np.minimum(
+            self._weights_delta[same_sign] * eta_positive, delta_max
+        )
+        self._weights[same_sign] -= (
+            np.sign(self._weights_derivative[same_sign]) *
+            self._weights_delta[same_sign]
+        )
+        self._last_weights_derivative[same_sign] = (
+            self._weights_derivative[same_sign]
+        )
 
-            no_sign = (
-                self._accumulated_weights_delta *
-                self._last_accumulated_weights_delta == 0
-            )
-            self._weights[no_sign] -= (
-                np.sign(self._accumulated_weights_delta[no_sign]) *
-                self._weights_delta[no_sign]
-            )
-            self._last_accumulated_weights_delta[no_sign] = (
-                self._accumulated_weights_delta[no_sign]
-            )
+        diff_sign = (
+            self._weights_derivative *
+            self._last_weights_derivative < 0
+        )
+        self._weights_delta[diff_sign] = np.maximum(
+            self._weights_delta[diff_sign] * eta_negative, delta_min
+        )
+        self._last_weights_derivative[diff_sign] = 0
 
-            same_sign = (
-                self._last_accumulated_bias_delta *
-                self._accumulated_biases_delta > 0
-            )
-            self._biases[same_sign] -= (
-                np.sign(self._accumulated_biases_delta[same_sign]) *
-                self._biases_delta[same_sign]
-            )
-            self._biases_delta[same_sign] = np.minimum(
-                self._biases_delta[same_sign] * eta_positive, delta_max
-            )
-            self._last_accumulated_bias_delta[same_sign] = (
-                self._accumulated_biases_delta[same_sign]
-            )
+        no_sign = (
+            self._weights_derivative *
+            self._last_weights_derivative == 0
+        )
+        self._weights[no_sign] -= (
+            np.sign(self._weights_derivative[no_sign]) *
+            self._weights_delta[no_sign]
+        )
+        self._last_weights_derivative[no_sign] = (
+            self._weights_derivative[no_sign]
+        )
 
-            diff_sign = (
-                self._accumulated_biases_delta *
-                self._last_accumulated_bias_delta < 0
-            )
-            self._biases_delta[diff_sign] = np.maximum(
-                self._biases_delta[diff_sign] * eta_negative, delta_min
-            )
-            self._last_accumulated_bias_delta[diff_sign] = 0
+        same_sign = (
+            self._last_biases_derivative *
+            self._biases_derivative > 0
+        )
+        self._biases[same_sign] -= (
+            np.sign(self._biases_derivative[same_sign]) *
+            self._biases_delta[same_sign]
+        )
+        self._biases_delta[same_sign] = np.minimum(
+            self._biases_delta[same_sign] * eta_positive, delta_max
+        )
+        self._last_biases_derivative[same_sign] = (
+            self._biases_derivative[same_sign]
+        )
 
-            no_sign = (
-                self._accumulated_biases_delta *
-                self._last_accumulated_bias_delta == 0
-            )
-            self._biases[no_sign] -= (
-                np.sign(self._accumulated_biases_delta[no_sign]) *
-                self._biases_delta[no_sign]
-            )
-            self._last_accumulated_bias_delta[no_sign] = (
-                self._accumulated_biases_delta[no_sign]
-            )
+        diff_sign = (
+            self._biases_derivative *
+            self._last_biases_derivative < 0
+        )
+        self._biases_delta[diff_sign] = np.maximum(
+            self._biases_delta[diff_sign] * eta_negative, delta_min
+        )
+        self._last_biases_derivative[diff_sign] = 0
 
-            self._accumulated_weights_delta = np.zeros(self._weights.shape)
-            self._accumulated_biases_delta = np.zeros(self._biases.shape)
+        no_sign = (
+            self._biases_derivative *
+            self._last_biases_derivative == 0
+        )
+        self._biases[no_sign] -= (
+            np.sign(self._biases_derivative[no_sign]) *
+            self._biases_delta[no_sign]
+        )
+        self._last_biases_derivative[no_sign] = (
+            self._biases_derivative[no_sign]
+        )
+
+        self._weights_derivative = np.zeros(self._weights.shape)
+        self._biases_derivative = np.zeros(self._biases.shape)
