@@ -34,6 +34,8 @@ class Layer:
         self._out_data = None
         self._weights = None
         self._biases = None
+        self._weights_derivative = None
+        self._biases_derivative = None
         self._copies = 0
 
     def is_built(self) -> bool:
@@ -62,6 +64,10 @@ class Layer:
 
     @require_built
     def update(self, **kwargs) -> None:
+        raise NotImplementedError
+
+    @require_built
+    def predict(self, in_data: np.ndarray) -> np.ndarray:
         raise NotImplementedError
 
     @property
@@ -151,8 +157,6 @@ class Dense(Layer):
         name: Optional[str] = None,
     ):
         super().__init__(width, activation, name)
-        self._weights_derivative = None
-        self._biases_derivative = None
 
     @require_not_built
     def build(
