@@ -29,7 +29,11 @@ class Dataset:
         lt_labels = self.labels[:, choices[:lt_dataset_size]]
         return Dataset(lt_data, lt_labels), Dataset(rt_data, rt_labels)
 
-    def k_fold(self, n_splits: int = 2, shuffle: bool = False):
+    def k_fold(
+        self,
+        n_splits: int = 2,
+        shuffle: bool = False
+    ) -> list[tuple[Dataset, Dataset]]:
         if not 1 < n_splits < self.data.shape[1]:
             raise ValueError(
                 f"n_split must be greater in [2, {self.data.shape[1]}]."
@@ -50,7 +54,7 @@ class Dataset:
             ) for k in range(n_splits)
         ]
 
-    def random(self, instances: int = 10000):
+    def random(self, instances: int = 10000) -> Dataset:
         if instances >= self.size:
             raise ValueError(
                 f"too many instances requested - "
