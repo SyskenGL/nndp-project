@@ -25,7 +25,7 @@ class MLP:
         self,
         layers: list[Layer] = None,
         loss: Loss = Loss.SSE,
-        name: Optional[str] = None,
+        name: Optional[str] = None
     ):
         self._name = (
             name if name is not None
