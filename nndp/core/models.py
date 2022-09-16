@@ -347,7 +347,7 @@ class MLP:
             if self.is_built() else 0
         )
 
-    def save(self, path: str = None):
+    def save(self, path: str = None) -> None:
         if path is None:
             path = os.path.join(os.path.dirname(nndp.data.__file__), "saved")
             if not os.path.isdir(path):
@@ -358,7 +358,7 @@ class MLP:
             file.write(pickletools.optimize(pickled))
 
     @staticmethod
-    def load(path: str):
+    def load(path: str) -> MLP:
         with open(path, "rb") as file:
             unpickled = pickle.Unpickler(file)
             return unpickled.load()
