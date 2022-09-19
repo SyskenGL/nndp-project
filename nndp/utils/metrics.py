@@ -64,9 +64,9 @@ class Target:
 
     def is_satisfied(self, current_target: float):
         if self._metric != Metric.LOSS:
-            return current_target > self._target
+            return current_target >= self._target
         else:
-            return current_target < self._target
+            return current_target <= self._target
 
     @property
     def metric(self):
