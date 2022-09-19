@@ -169,7 +169,7 @@ class MLP:
         weak_stop: bool = True,
         stats: Optional[list[Metric]] = (Metric.LOSS,),
         **kwargs
-    ) -> list:
+    ) -> dict:
 
         targets = [] if targets is None else targets
         stats = [] if stats is None else stats
@@ -192,7 +192,15 @@ class MLP:
         if len(stats) != len(set(stats)):
             raise ValueError(f"multiple stats with same metric provided.")
 
-        training_stats = []
+        _stats = {
+            "epochs": 0,
+            "training": {metric.name.lower(): [] for metric in stats},
+            "validation": (
+                {metric.name.lower(): [] for metric in stats}
+                if validation_set else {}
+            )
+        }
+
         batches = [
             Dataset(data, labels)
             for data, labels in
@@ -231,9 +239,9 @@ class MLP:
                 )
                 targets_satisfied.append(target.is_satisfied(current_target))
 
+            _stats["epochs"] += 1
             if len(stats) != 0:
 
-                epoch_stats = {"epoch": epoch, "training": {}, "validation": {}}
                 for metric in stats:
                     if metric != Metric.LOSS:
                         metric_function = metric.score()
@@ -241,26 +249,27 @@ class MLP:
                     else:
                         metric_function = self._loss.function()
                         metric_name = "loss"
-                    epoch_stats["training"][metric_name] = metric_function(
+                    _stats["training"][metric_name].append(metric_function(
                         training_predictions,
                         training_set.labels
-                    )
+                    ))
                     if validation_set is not None:
-                        epoch_stats["validation"][metric_name] = metric_function(
+                        _stats["validation"][metric_name].append(metric_function(
                             validation_predictions,
                             validation_set.labels
-                        )
-                training_stats.append(epoch_stats)
+                        ))
 
                 learning_method = (
                     "on-line" if (n_batches == 0 or n_batches == training_set.size) else
                     ("full-batch" if n_batches == 1 else "mini-batch")
                 )
                 log = f"\033[1m Epoch \033[0m{epoch + 1} of {epochs} - [{learning_method}]\n"
-                for metric, value in epoch_stats["training"].items():
+                for metric in _stats["training"].keys():
+                    value = _stats["training"][metric][-1]
                     log += f"\n\033[1m   • Training {metric}:\033[0m {value:.3f}"
                 log += "\n"
-                for metric, value in epoch_stats["validation"].items():
+                for metric in _stats["validation"].keys():
+                    value = _stats["validation"][metric][-1]
                     log += f"\n\033[1m   • Validation {metric}:\033[0m {value:.3f}"
                 log += "\n"
                 for target in targets:
@@ -278,7 +287,7 @@ class MLP:
             ):
                 break
 
-        return training_stats
+        return _stats
 
     @require_built
     def _forward_propagation(self, in_data: np.ndarray) -> None:
