@@ -126,7 +126,8 @@ class MLP:
         n_splits: int = 5,
         metrics: list[Metric] = (Metric.LOSS,),
         epochs: int = 30,
-        n_batches: int = 1
+        n_batches: int = 1,
+        **kwargs
     ) -> dict:
 
         if metrics is None or len(metrics) == 0:
@@ -144,7 +145,11 @@ class MLP:
                 f" - {k + 1} of {n_splits}\033[0m"
             )
             model.fit(
-                training_set, n_batches=n_batches, epochs=epochs, stats=None
+                training_set,
+                n_batches=n_batches,
+                epochs=epochs,
+                stats=None,
+                **kwargs
             )
             scores.append(model.validate(validation_set, metrics))
         scores = {
