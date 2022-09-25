@@ -193,7 +193,7 @@ class MLP:
 
         early_stops_metrics = [early_stop.metric for early_stop in early_stops]
         if len(early_stops_metrics) != len(set(early_stops_metrics)):
-            raise ValueError(f"multiple targets with same metric provided.")
+            raise ValueError(f"multiple early stops with same metric provided.")
         if len(stats) != len(set(stats)):
             raise ValueError(f"multiple stats with same metric provided.")
 
