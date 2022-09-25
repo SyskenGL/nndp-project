@@ -279,7 +279,7 @@ class MLP:
                 log += "\n"
                 for early_stop in early_stops:
                     log += (
-                        f"\n\033[1m   • ES {early_stop.metric.name.lower()}:"
+                        f"\n\033[1m   • Early-Stop {early_stop.metric.name.lower()}:"
                         f"\033[0m {early_stop.trigger:.3f} {'% - greedy' if early_stop.greedy else ''}"
                     )
                 self._logger.info(log)
