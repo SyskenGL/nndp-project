@@ -52,26 +52,51 @@ class Metric(Enum):
         ][self.value]
 
 
-class Target:
+class EarlyStop:
 
-    def __init__(self, metric: Metric, target: float):
-        if metric != Metric.LOSS and not 0 < target < 1:
+    def __init__(
+        self,
+        metric: Metric,
+        trigger: float,
+        greedy: bool = False
+    ):
+        if greedy and not 0 < trigger < 100:
+            raise ValueError(
+                f"trigger for metric {metric.name.lower()} must be in (0, 100)."
+            )
+        elif not greedy and metric != Metric.LOSS and not 0 < trigger < 1:
             raise ValueError(
                 f"target for metric {metric.name.lower()} must be in (0, 1)."
             )
         self._metric = metric
-        self._target = target
+        self._trigger = trigger
+        self._greedy = greedy
+        self._best = None
 
-    def is_satisfied(self, current_target: float):
-        if self._metric != Metric.LOSS:
-            return current_target >= self._target
+    def is_satisfied(self, value: float):
+        if self._greedy:
+            self._best = value if self._best is None else self._best
+            variation = (value - self._best) / self._best * 100.0
+            if self._metric != Metric.LOSS:
+                self._best = value if value > self._best else self._best
+                return variation <= (-1 * self._trigger)
+            else:
+                self._best = value if value < self._best else self._best
+                return variation >= self._trigger
         else:
-            return current_target <= self._target
+            if self._metric != Metric.LOSS:
+                return value >= self._trigger
+            else:
+                return value <= self._trigger
 
     @property
     def metric(self):
         return self._metric
 
     @property
-    def target(self):
-        return self._target
+    def trigger(self):
+        return self._trigger
+
+    @property
+    def greedy(self):
+        return self._greedy

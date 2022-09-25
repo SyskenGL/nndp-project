@@ -14,7 +14,7 @@ from nndp.core.layers import Layer
 from nndp.errors import EmptyModelError
 from nndp.utils.collections import Dataset
 from nndp.utils.functions import Loss
-from nndp.utils.metrics import Target, Metric
+from nndp.utils.metrics import EarlyStop, Metric
 from nndp.utils.decorators import require_built
 from nndp.utils.decorators import require_not_built
 
@@ -170,20 +170,20 @@ class MLP:
         validation_set: Optional[Dataset] = None,
         n_batches: int = 1,
         epochs: int = 500,
-        targets: Optional[list[Target]] = None,
+        early_stops: Optional[list[EarlyStop]] = None,
         weak_stop: bool = True,
         stats: Optional[list[Metric]] = (Metric.LOSS,),
         **kwargs
     ) -> dict:
 
-        targets = [] if targets is None else targets
+        early_stops = [] if early_stops is None else early_stops
         stats = [] if stats is None else stats
 
         if training_set.size == 0:
             raise ValueError("provided an empty training set.")
         if validation_set and validation_set.size == 0:
             raise ValueError("provided an empty validation set.")
-        if not validation_set and len(targets) != 0:
+        if not validation_set and len(early_stops) != 0:
             raise ValueError(f"expected a validation set.")
 
         if not 0 <= n_batches <= training_set.size:
@@ -191,8 +191,8 @@ class MLP:
         if epochs <= 0:
             raise ValueError(f"epochs must be greater than 0.")
 
-        target_metrics = [target.metric for target in targets]
-        if len(target_metrics) != len(set(target_metrics)):
+        early_stops_metrics = [early_stop.metric for early_stop in early_stops]
+        if len(early_stops_metrics) != len(set(early_stops_metrics)):
             raise ValueError(f"multiple targets with same metric provided.")
         if len(stats) != len(set(stats)):
             raise ValueError(f"multiple stats with same metric provided.")
@@ -232,17 +232,17 @@ class MLP:
                 if validation_set is not None else None
             )
 
-            targets_satisfied = []
-            for target in targets:
-                if target.metric != Metric.LOSS:
-                    metric_function = target.metric.score()
+            early_stop_satisfied = []
+            for early_stop in early_stops:
+                if early_stop.metric != Metric.LOSS:
+                    metric_function = early_stop.metric.score()
                 else:
                     metric_function = self._loss.function()
-                current_target = metric_function(
+                current_value = metric_function(
                     validation_predictions,
                     validation_set.labels
                 )
-                targets_satisfied.append(target.is_satisfied(current_target))
+                early_stop_satisfied.append(early_stop.is_satisfied(current_value))
 
             _stats["epochs"] += 1
             if len(stats) != 0:
@@ -277,17 +277,17 @@ class MLP:
                     value = _stats["validation"][metric][-1]
                     log += f"\n\033[1m   • Validation {metric}:\033[0m {value:.3f}"
                 log += "\n"
-                for target in targets:
+                for early_stop in early_stops:
                     log += (
-                        f"\n\033[1m   • Target {target.metric.name.lower()}:"
-                        f"\033[0m {target.target:.3f}"
+                        f"\n\033[1m   • ES {early_stop.metric.name.lower()}:"
+                        f"\033[0m {early_stop.trigger:.3f} {'% - greedy' if early_stop.greedy else ''}"
                     )
                 self._logger.info(log)
 
             if (
-                len(targets_satisfied) != 0 and (
-                    weak_stop and any(targets_satisfied) or
-                    not weak_stop and all(targets_satisfied)
+                len(early_stop_satisfied) != 0 and (
+                    weak_stop and any(early_stop_satisfied) or
+                    not weak_stop and all(early_stop_satisfied)
                 )
             ):
                 break
