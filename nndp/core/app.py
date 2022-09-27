@@ -17,37 +17,54 @@ if __name__ == "__main__":
     loader = MNIST()
 
     # Suddivisione dataset in training set, validation test e test set
-    dataset = loader.scaled_dataset.random(instances=5000)
+    dataset = loader.scaled_dataset.random(instances=50000)
+    training_set, validation_set = dataset.split(0.25)
 
-    with open("k_fold.csv", mode="w") as file:
-        writer = csv.DictWriter(file, ["neurons", "eta_negative", "eta_positive", "accuracy"])
+    mlp = MLP(
+        [
+            ResilientDense(100, Activation.SIGMOID),
+            ResilientDense(10, Activation.IDENTITY),
+        ],
+        Loss.SOFTMAX_CROSS_ENTROPY
+    )
+    mlp.build(784)
+
+    stats = mlp.fit(
+        training_set,
+        validation_set,
+        epochs=5000,
+        early_stops=[EarlyStop(Metric.LOSS, 5, True)],
+        stats=[Metric.LOSS, Metric.ACCURACY, Metric.F1],
+        eta_negative=0.25,
+        eta_positive=1.05
+    )
+
+    epochs = stats["epochs"]
+    training_loss = [stats["training"]["loss"][epoch] for epoch in range(stats["epochs"])]
+    validation_loss = [stats["validation"]["loss"][epoch] for epoch in range(stats["epochs"])]
+    training_accuracy = [stats["training"]["accuracy"][epoch] for epoch in range(stats["epochs"])]
+    validation_accuracy = [stats["validation"]["accuracy"][epoch] for epoch in range(stats["epochs"])]
+    training_f1 = [stats["training"]["f1"][epoch] for epoch in range(stats["epochs"])]
+    validation_f1 = [stats["validation"]["f1"][epoch] for epoch in range(stats["epochs"])]
+
+    with open("100_0-25_1-05.csv", "w") as file:
+        writer = csv.DictWriter(file, [
+            "epoch",
+            "training_loss",
+            "validation_loss",
+            "training_accuracy",
+            "validation_accuracy",
+            "training_f1",
+            "validation_f1"
+        ], delimiter=';')
         writer.writeheader()
-        for neurons in [85, 90, 95]:
-            for eta_negative in [0.05, 0.10, 0.15, 0.20, 0.25]:
-                for eta_positive in [1.05, 1.10, 1.15, 1.20, 1.25]:
-                    mlp = MLP(
-                        [
-                            ResilientDense(neurons, Activation.SIGMOID),
-                            ResilientDense(10, Activation.IDENTITY),
-                        ],
-                        Loss.SOFTMAX_CROSS_ENTROPY
-                    )
-                    mlp.build(784)
-                    results = mlp.cross_validate(
-                        dataset,
-                        5,
-                        metrics=[Metric.ACCURACY],
-                        epochs=50,
-                        eta_negative=eta_negative,
-                        eta_positive=eta_positive
-                    )
-                    print(
-                        f"neurons: {neurons} - eta negative: {eta_negative} - "
-                        f"eta_positive {eta_positive} - results: {results}"
-                    )
-                    writer.writerow({
-                        "neurons": neurons,
-                        "eta_negative": eta_negative,
-                        "eta_positive": eta_positive,
-                        "accuracy": f"avg: {results['accuracy'][0]} - std: {results['accuracy'][1]}"
-                    })
+        for epoch in range(epochs):
+            writer.writerow({
+                "epoch": epoch,
+                "training_loss": training_loss[epoch],
+                "validation_loss": validation_loss[epoch],
+                "training_accuracy": training_accuracy[epoch],
+                "validation_accuracy": validation_accuracy[epoch],
+                "training_f1": training_f1[epoch],
+                "validation_f1": validation_f1[epoch]
+            })
