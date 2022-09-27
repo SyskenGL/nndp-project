@@ -55,7 +55,7 @@ class Dataset:
         ]
 
     def random(self, instances: int = 10000) -> Dataset:
-        if instances >= self.size:
+        if instances > self.size:
             raise ValueError(
                 f"too many instances requested - "
                 f"dataset size: {self.size}."

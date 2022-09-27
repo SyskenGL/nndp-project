@@ -67,3 +67,4 @@ if __name__ == "__main__":
                 "validation_accuracy": validation_accuracy[epoch],
                 "training_f1": training_f1[epoch],
                 "validation_f1": validation_f1[epoch]
+            })
